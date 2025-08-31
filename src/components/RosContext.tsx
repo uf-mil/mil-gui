@@ -60,7 +60,7 @@ export function RosProvider({ children }: RosProviderProps) {
     const reconnectInterval = 5000; // in ms
     useEffect(() => {
         // if connected, stop trying to connect and return
-        const connected_but_still_trying_to_reconnect = (connected == true) && !(reconnectTimerRef.current === null)
+        const connected_but_still_trying_to_reconnect = (connected === true) && !(reconnectTimerRef.current === null)
         if (connected_but_still_trying_to_reconnect) {
             clearInterval(reconnectTimerRef.current!)
             reconnectTimerRef.current = null
@@ -68,7 +68,7 @@ export function RosProvider({ children }: RosProviderProps) {
         }
 
         // if not connected and not trying to reconnect, start trying
-        const not_connected_and_not_trying_to_reconnect = (connected == false) && (reconnectTimerRef.current === null)
+        const not_connected_and_not_trying_to_reconnect = (connected === false) && (reconnectTimerRef.current === null)
         if (not_connected_and_not_trying_to_reconnect) {
             reconnectTimerRef.current = setInterval(connect_to_ros, reconnectInterval)
         }
