@@ -1,0 +1,328 @@
+/* Main card container */
+.preflight-card {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #3498db;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 20px;
+  background-color: #f8f9fa;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Top row containing bad and good cards */
+.preflight-card::before {
+  content: "";
+  display: flex;
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+/* Bad and good card container (flex row) */
+.preflight-card > div:not(.preflight-logs-card) {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  margin-bottom: 16px;
+  height: 200px; /* Fixed height for top cards */
+}
+
+/* Bad card - for error messages */
+.preflight-bad-card {
+  flex: 1;
+  background-color: #ffebee;
+  border: 2px solid #e53935;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 50px;
+  overflow-y: auto;
+}
+
+/* Style for bad card items */
+.bad-card-li {
+  color: #d32f2f;
+  font-weight: bold;
+  background-color: #ffcdd2;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
+  list-style-type: none;
+}
+
+/* Good card - for active topics */
+.preflight-good-card {
+  flex: 1;
+  background-color: #e8f5e9;
+  border: 2px solid #43a047;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 50px;
+  overflow-y: auto;
+}
+
+/* Style for good card items - UPDATED to prevent resizing */
+.good-card-li {
+  color: #2e7d32;
+  font-weight: bold;
+  background-color: #c8e6c9;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
+  list-style-type: none;
+  
+  /* NEW: Fixed width properties to prevent layout shifts */
+  width: calc(100% - 24px);
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Courier New', monospace;
+}
+
+/* NEW: Create a container for the changing Hz value */
+.good-card-li::after {
+  content: "";
+  display: inline-block;
+  width: 70px; /* Fixed width for the Hz value area */
+  text-align: right;
+}
+
+/* Logs card - UPDATED: increased height */
+.preflight-logs-card {
+  display: flex;
+  flex-direction: row;
+  border: 2px solid #7e57c2;
+  border-radius: 8px;
+  padding: 12px;
+  background-color: #f3e5f5;
+  height: 300px; /* CHANGED: Increased from 200px to 300px */
+  overflow-y: hidden; /* CHANGED: from auto to hidden */
+}
+
+/* NEW: Completely redesigned IMU log section */
+.imu-log {
+  flex: 1;
+  padding: 8px;
+  border-right: 1px dashed #b39ddb;
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Create 2 columns */
+  grid-column-gap: 10px;
+  align-content: start;
+}
+
+/* NEW: Add header to IMU section */
+.imu-log::before {
+  content: "IMU Data";
+  grid-column: 1 / -1;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #5e35b1;
+  border-bottom: 1px solid #b39ddb;
+}
+
+/* UPDATED: Log lists within IMU section */
+.imu-log .log-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: contents; /* Make list part of grid */
+}
+
+/* UPDATED: Log items within IMU section */
+.imu-log .log-list-item {
+  font-family: monospace;
+  padding: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: auto;
+  font-size: 0.9em;
+}
+
+/* NEW: Visual grouping for IMU data types */
+.imu-log .log-list-item:nth-child(-n+4) {
+  background-color: rgba(179, 157, 219, 0.1); /* Quaternion background */
+}
+
+.imu-log .log-list-item:nth-child(n+5):nth-child(-n+7) {
+  background-color: rgba(121, 134, 203, 0.1); /* Linear acceleration background */
+}
+
+.imu-log .log-list-item:nth-child(n+8):nth-child(-n+10) {
+  background-color: rgba(100, 181, 246, 0.1); /* Angular twist background */
+}
+
+/* Updated Depth log section to match IMU and DVL styles */
+.depth-log {
+  flex: 1;
+  padding: 8px;
+  border-right: none; /* Last section, no right border */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add header to Depth section similar to others */
+.depth-log::before {
+  content: "Depth Sensor";
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #5e35b1;
+  border-bottom: 1px solid #b39ddb;
+}
+
+/* Style the depth value container */
+.depth-log {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Create a styled container for the depth value */
+.depth-log::after {
+  content: attr(data-unit);
+  font-size: 0.9em;
+  color: #7e57c2;
+  margin-top: 4px;
+}
+
+/* Style for the actual depth value */
+.depth-log {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Create proper labeling for depth value */
+.depth-log::after {
+  content: "joe handsome";
+  font-size: 0.8em;
+  color: #7e57c2;
+  margin-top: 4px;
+}
+
+/* Make depth value stand out */
+.depth-log > div {
+  background-color: rgba(179, 157, 219, 0.2);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  text-align: center;
+  font-size: 36px;
+  font-weight: bold;
+  color: #5e35b1;
+  font-family: 'Courier New', monospace;
+  position: relative;
+}
+
+/* Add depth label */
+.depth-log > div::before {
+  content: "Z Position:";
+  position: absolute;
+  top: -20px;
+  left: 0;
+  font-size: 14px;
+  font-weight: normal;
+  color: #5e35b1;
+}
+
+/* Add decimal precision formatting for depth */
+.depth-log > div {
+  position: relative;
+}
+
+/* Format the depth value to show proper decimals */
+.depth-log > div::after {
+  content: " m";
+  font-size: 20px;
+  vertical-align: middle;
+  color: #7e57c2;
+}
+
+/* General log list style - for non-IMU logs */
+.log-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* General log list item style - for non-IMU logs */
+.log-list-item {
+  font-family: monospace;
+  padding: 4px 0;
+  width: 24ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Empty list styling */
+.preflight-bad-card:empty::after {
+  content: "All systems operational";
+  color: #757575;
+  font-style: italic;
+  align-self: center;
+  margin: auto;
+}
+
+.preflight-good-card:empty::after {
+  content: "No active topics";
+  color: #757575;
+  font-style: italic;
+  align-self: center;
+  margin: auto;
+}
+/* DVL log section - CSS only solution */
+.dvl-log {
+  flex: 1;
+  padding: 8px;
+  border-right: 1px dashed #b39ddb;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add header to DVL section */
+.dvl-log::before {
+  content: "DVL Data";
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #5e35b1;
+  border-bottom: 1px solid #b39ddb;
+}
+
+/* Style DVL list */
+.dvl-log ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Style DVL list items */
+.dvl-log .log-list-item {
+  font-family: monospace;
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: rgba(100, 181, 246, 0.1);
+  border-radius: 4px;
+  width: fit-content;
+  
+  /* Force line breaks to show full values */
+  white-space: normal;
+  word-break: break-all;
+  font-size: 0.9em;
+  line-height: 1.4;
+  
+  /* Make the label distinct from the value */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add more space between label and value */
+.dvl-log .log-list-item::after {
+  content: "";
+  height: 4px;
+}

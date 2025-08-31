@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import Publisher from './components/publisher';
+import Preflight from './components/preflight';
 
 import { RosProvider } from './components/RosContext'
 
@@ -8,7 +8,7 @@ function App() {
   return (
     <RosProvider>
         <div className="App">
-            <Publisher/>
+            <Preflight/>
         </div>
     </RosProvider> 
   );
