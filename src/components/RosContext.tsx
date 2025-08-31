@@ -44,8 +44,10 @@ export function RosProvider({ children }: RosProviderProps) {
     // on start up
     useEffect(() => {
 
-        // Initialize ROS instance TODO maybe only connect if not connected??
-        connect_to_ros()
+        // Initialize ROS instance 
+        if (!rosRef.current.isConnected){
+            connect_to_ros()
+        }
 
         // Cleanup on unmount
         return () => {
