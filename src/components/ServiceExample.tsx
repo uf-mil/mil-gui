@@ -13,8 +13,8 @@ interface TriggerResponse {
 
 function ServiceExample() {
     const [callService, { data, error, isLoading }] = useService<TriggerRequest, TriggerResponse>(
-        '/example_service',  // Replace with your actual service name
-        'std_srvs/Trigger'  // Replace with your actual service type
+        '/kill',  // Replace with your actual service name
+        'std_srvs/Empty'  // Replace with your actual service type
     );
 
     const handleServiceCall = async () => {
@@ -33,7 +33,7 @@ function ServiceExample() {
                 onClick={handleServiceCall}
                 disabled={isLoading}
             >
-                {isLoading ? 'Calling Service...' : 'Call Service'}
+                {isLoading ? 'Calling kill Service...' : 'Call kill Service'}
             </button>
 
             {error && (
