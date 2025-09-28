@@ -4,6 +4,9 @@
 
 `npm install`
 
+install dependancies<br>
+`npm install react-scripts@5.0.1`
+
 `npm start`
 :)
 
