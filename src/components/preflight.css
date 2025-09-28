@@ -11,23 +11,61 @@
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
+  gap: 0;
 }
 
-/* Top row containing bad and good cards */
-.preflight-card::before {
-  content: "";
-  display: flex;
-  flex: 1;
+/* ROS Connection Status Styling */
+.ros-connection-status {
+  padding: 12px 16px;
+  border-radius: 8px;
   margin-bottom: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
 }
 
-/* Bad and good card container (flex row) */
-.preflight-card > div:not(.preflight-logs-card) {
+.ros-connection-status.connected {
+  background-color: #e8f5e8;
+  border: 2px solid #4caf50;
+  color: #2e7d32;
+}
+
+.ros-connection-status.disconnected {
+  background-color: #ffebee;
+  border: 2px solid #f44336;
+  color: #c62828;
+}
+
+.ros-connection-status h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.2em;
+}
+
+.ros-connection-status p {
+  margin: 0;
+  font-size: 0.9em;
+}
+
+/* Simulation container */
+.simulation-container {
+  margin-bottom: 16px;
+  transition: margin-bottom 0.3s ease;
+  min-height: fit-content;
+}
+
+/* Compact spacing when simulation panel is collapsed */
+.simulation-container:has(.simulation-control:not(.expanded)) {
+  margin-bottom: 2px;
+}
+
+
+
+/* Topic status row (bad/good columns) */
+.preflight-top-row {
   display: flex;
   flex-direction: row;
   gap: 16px;
   margin-bottom: 16px;
-  height: 200px; /* Fixed height for top cards */
+  align-items: stretch;
 }
 
 /* Bad card - for error messages */
@@ -67,7 +105,7 @@
   overflow-y: auto;
 }
 
-/* Style for good card items - UPDATED to prevent resizing */
+/* Style for good card items (prevent layout shift) */
 .good-card-li {
   color: #2e7d32;
   font-weight: bold;
@@ -77,7 +115,7 @@
   border-radius: 4px;
   list-style-type: none;
   
-  /* NEW: Fixed width properties to prevent layout shifts */
+  /* Fixed width properties to prevent layout shifts */
   width: calc(100% - 24px);
   box-sizing: border-box;
   display: flex;
@@ -85,7 +123,7 @@
   font-family: 'Courier New', monospace;
 }
 
-/* NEW: Create a container for the changing Hz value */
+/* Reserved area for the Hz value */
 .good-card-li::after {
   content: "";
   display: inline-block;
@@ -93,7 +131,7 @@
   text-align: right;
 }
 
-/* Logs card - UPDATED: increased height */
+/* Logs card */
 .preflight-logs-card {
   display: flex;
   flex-direction: row;
@@ -101,22 +139,22 @@
   border-radius: 8px;
   padding: 12px;
   background-color: #f3e5f5;
-  height: 300px; /* CHANGED: Increased from 200px to 300px */
-  overflow-y: hidden; /* CHANGED: from auto to hidden */
+  height: 300px;
+  overflow-y: hidden;
 }
 
-/* NEW: Completely redesigned IMU log section */
+/* IMU log section */
 .imu-log {
   flex: 1;
   padding: 8px;
   border-right: 1px dashed #b39ddb;
   display: grid;
-  grid-template-columns: 1fr 1fr; /* Create 2 columns */
+  grid-template-columns: 1fr 1fr;
   grid-column-gap: 10px;
   align-content: start;
 }
 
-/* NEW: Add header to IMU section */
+/* IMU header */
 .imu-log::before {
   content: "IMU Data";
   grid-column: 1 / -1;
@@ -126,7 +164,7 @@
   border-bottom: 1px solid #b39ddb;
 }
 
-/* UPDATED: Log lists within IMU section */
+/* IMU list container */
 .imu-log .log-list {
   list-style-type: none;
   padding: 0;
@@ -134,7 +172,7 @@
   display: contents; /* Make list part of grid */
 }
 
-/* UPDATED: Log items within IMU section */
+/* IMU list items */
 .imu-log .log-list-item {
   font-family: monospace;
   padding: 4px 0;
@@ -145,7 +183,7 @@
   font-size: 0.9em;
 }
 
-/* NEW: Visual grouping for IMU data types */
+/* Visual grouping for IMU data types */
 .imu-log .log-list-item:nth-child(-n+4) {
   background-color: rgba(179, 157, 219, 0.1); /* Quaternion background */
 }
@@ -158,7 +196,7 @@
   background-color: rgba(100, 181, 246, 0.1); /* Angular twist background */
 }
 
-/* Updated Depth log section to match IMU and DVL styles */
+/* Depth log section */
 .depth-log {
   flex: 1;
   padding: 8px;
@@ -166,8 +204,6 @@
   display: flex;
   flex-direction: column;
 }
-
-/* Add header to Depth section similar to others */
 .depth-log::before {
   content: "Depth Sensor";
   font-weight: bold;
@@ -176,36 +212,28 @@
   border-bottom: 1px solid #b39ddb;
 }
 
-/* Style the depth value container */
-.depth-log {
+/* Depth value presentation (container, label, and units) */
+.depth-log::before {
   display: flex;
   flex-direction: column;
 }
-
-/* Create a styled container for the depth value */
 .depth-log::after {
   content: attr(data-unit);
   font-size: 0.9em;
   color: #7e57c2;
   margin-top: 4px;
 }
-
-/* Style for the actual depth value */
 .depth-log {
   position: relative;
   display: flex;
   flex-direction: column;
 }
-
-/* Create proper labeling for depth value */
 .depth-log::after {
   content: "joe handsome";
   font-size: 0.8em;
   color: #7e57c2;
   margin-top: 4px;
 }
-
-/* Make depth value stand out */
 .depth-log > div {
   background-color: rgba(179, 157, 219, 0.2);
   border-radius: 8px;
@@ -218,8 +246,6 @@
   font-family: 'Courier New', monospace;
   position: relative;
 }
-
-/* Add depth label */
 .depth-log > div::before {
   content: "Z Position:";
   position: absolute;
@@ -229,13 +255,9 @@
   font-weight: normal;
   color: #5e35b1;
 }
-
-/* Add decimal precision formatting for depth */
 .depth-log > div {
   position: relative;
 }
-
-/* Format the depth value to show proper decimals */
 .depth-log > div::after {
   content: " m";
   font-size: 20px;
@@ -276,7 +298,7 @@
   align-self: center;
   margin: auto;
 }
-/* DVL log section - CSS only solution */
+/* DVL log section */
 .dvl-log {
   flex: 1;
   padding: 8px;
