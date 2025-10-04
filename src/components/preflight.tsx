@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react'
+import React from 'react'
 import './preflight.css'
 import { useTopic } from '../hooks/useTopic';
+import { useRos } from './RosContext';
 import { PoseWithCovarianceStamped } from '../ros_msg_types/geometry_msgs'
 import { Odometry } from '../ros_msg_types/nav_msgs';
 import { Imu } from '../ros_msg_types/sensor_msgs';
+import SimulationControl from './SimulationControl';
 
 /*
     *
@@ -21,6 +23,7 @@ function create_dead_topic_list_item(topic_hz: number, msg: string) {
     return (<li className='bad-card-li'>{msg}</li>);
 }
 
+/** Helper: render a good item if the topic is publishing (hz > 0). */
 function create_alive_topic_list_item(topic_hz: number, msg: string) {
     const topic_is_dead = topic_hz === 0
     if (topic_is_dead) { return }
@@ -29,6 +32,9 @@ function create_alive_topic_list_item(topic_hz: number, msg: string) {
 }
 
 function Preflight() {
+    // Get ROS connection status
+    const { connected } = useRos();
+    
     // TODO add camera topics and display what the cameras see (either before or after AI)
     const [imu_msg, imu_hz, _imu_topic] = useTopic<Imu>('/imu/data', 'sensor_msgs/Imu');
     const [depth_msg, depth_hz, _depth_topic] = useTopic<PoseWithCovarianceStamped>('/depth/pose', 'geometry_msgs/PoseWithCovarianceStamped');
@@ -37,19 +43,37 @@ function Preflight() {
     return (
         <>
             <div className='preflight-card'>
-                <div className='preflight-bad-card'>
-                    {create_dead_topic_list_item(imu_hz, "imu lost!")}
-                    {create_dead_topic_list_item(dvl_hz, "dvl lost!")}
-                    {create_dead_topic_list_item(depth_hz, "depth lost!")}
+                {/* ROS connection status */}
+                <div className={`ros-connection-status ${connected ? 'connected' : 'disconnected'}`}>
+                    <h3>ROS Bridge Status: {connected ? '🟢 Connected' : '🔴 Disconnected'}</h3>
+                    {connected ? (
+                        <p>✅ Successfully connected to ROS bridge server (ws://localhost:9090)</p>
+                    ) : (
+                        <p>❌ Unable to connect to ROS bridge server. Make sure it's running.</p>
+                    )}
                 </div>
 
-                <div className='preflight-good-card'>
-                    {create_alive_topic_list_item(imu_hz, `Imu Hz: ${imu_hz}`)}
-                    {create_alive_topic_list_item(dvl_hz, `dvl Hz: ${dvl_hz}`)}
-                    {create_alive_topic_list_item(depth_hz, `Depth Hz: ${depth_hz}`)}
+                {/* Simulation Control */}
+                <div className="simulation-container">
+                    <SimulationControl connected={connected} />
                 </div>
 
-                <div className='preflight-log-card'>
+                <div className='preflight-top-row'>
+                    <div className='preflight-bad-card'>
+                        {!connected && <li className='bad-card-li'>ROS Bridge disconnected!</li>}
+                        {create_dead_topic_list_item(imu_hz, "imu lost!")}
+                        {create_dead_topic_list_item(dvl_hz, "dvl lost!")}
+                        {create_dead_topic_list_item(depth_hz, "depth lost!")}
+                    </div>
+
+                    <div className='preflight-good-card'>
+                        {create_alive_topic_list_item(imu_hz, `Imu Hz: ${imu_hz}`)}
+                        {create_alive_topic_list_item(dvl_hz, `dvl Hz: ${dvl_hz}`)}
+                        {create_alive_topic_list_item(depth_hz, `Depth Hz: ${depth_hz}`)}
+                    </div>
+                </div>
+
+                <div className='preflight-logs-card'>
                     <div className='imu-log'>
                         <ul className='log-list'>
                             <li className='log-list-item'>{`quat x: ${imu_msg?.orientation.x}`}</li>
