@@ -28,17 +28,11 @@
 
 /* Status-based borders */
 .simulation-control.stopped {
-  border-color: #ef4444; /* red */
-}
-
-@keyframes borderBlinkGreen {
-  0%, 100% { border-color: #10b981; box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
-  50% { border-color: #34d399; box-shadow: 0 0 0 4px rgba(16,185,129,0.15); }
+  border-color: #e53935; /* match bad card red */
 }
 
 .simulation-control.running {
-  border-color: #10b981; /* green */
-  animation: borderBlinkGreen 1.2s ease-in-out infinite;
+  border-color: #4caf50; /* match success green */
 }
 
 .simulation-control:not(.expanded) {

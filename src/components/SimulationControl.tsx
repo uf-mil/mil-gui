@@ -16,8 +16,18 @@ interface SimulationControlProps {
 const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
     // Simulation state
     const [isSimulating, setIsSimulating] = useState(false);
-    const [simulationScenario, setSimulationScenario] = useState('idle');
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [simulationScenario, setSimulationScenario] = useState(() => {
+        try {
+            const v = localStorage.getItem('sim.scenario');
+            return v ?? 'idle';
+        } catch { return 'idle'; }
+    });
+    const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+        try {
+            const v = localStorage.getItem('sim.expanded');
+            return v ? v === '1' : false;
+        } catch { return false; }
+    });
     const simulationRef = useRef<NodeJS.Timer | null>(null);
     
     const { ros } = useRos();
@@ -210,6 +220,15 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
             setIsSimulating(true);
         }
     };
+
+    // Persist scenario and expanded state
+    useEffect(() => {
+        try { localStorage.setItem('sim.scenario', simulationScenario); } catch {}
+    }, [simulationScenario]);
+
+    useEffect(() => {
+        try { localStorage.setItem('sim.expanded', isExpanded ? '1' : '0'); } catch {}
+    }, [isExpanded]);
 
     // Cleanup on unmount
     useEffect(() => {
