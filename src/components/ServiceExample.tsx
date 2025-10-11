@@ -30,6 +30,7 @@ function ServiceExample() {
         <div>
             <h2>ROS Service Example</h2>
             <button 
+                className="button-css"
                 onClick={handleServiceCall}
                 disabled={isLoading}
             >
