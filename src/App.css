@@ -13,6 +13,24 @@
   }
 }
 
+.button-css {
+  background-color: #e83232;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(22, 21, 22, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+
+.button-css:hover {
+  background-color: #ab2525;
+  transform: translateY(-2px);
+}
+
 .App-header {
   background-color: #282c34;
   min-height: 100vh;
