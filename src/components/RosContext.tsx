@@ -37,8 +37,44 @@ export function RosProvider({ children }: RosProviderProps) {
     });
 
 
+    /**
+     * resolve the ROS bridge websocket URL, made it ***Dynamic*** :)
+     * priority (highest to lowest):
+     * - URL query params: ?ros_host=HOST&ros_port=PORT or ?ros_ws=ws://host:port
+     * - localStorage: ros.host, ros.port, ros.ws
+     * - ENV (build-time): REACT_APP_ROSBRIDGE_HOST, REACT_APP_ROSBRIDGE_PORT
+     * - if page host is not localhost/127.0.0.1, use window.location.hostname
+     * - fallback default: localhost:9090 (works with WSL2)
+     */
+    function getRosBridgeUrl(): string {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const qpWs = params.get('ros_ws');
+            if (qpWs) return qpWs;
+
+            const lsWs = localStorage.getItem('ros.ws');
+            if (lsWs) return lsWs;
+
+            const qpHost = params.get('ros_host') ?? localStorage.getItem('ros.host') ?? process.env.REACT_APP_ROSBRIDGE_HOST ?? '';
+            const qpPort = params.get('ros_port') ?? localStorage.getItem('ros.port') ?? process.env.REACT_APP_ROSBRIDGE_PORT ?? '';
+
+            const pageHost = window.location.hostname;
+            // default to localhost (works with WSL2), or use page hostname if deployed remotely
+            const defaultHost = (pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1') ? pageHost : 'localhost';
+            const host = qpHost || defaultHost;
+            const port = qpPort || '9090';
+            const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            return `${protocol}://${host}:${port}`;
+        } catch {
+            // safe fallback
+            return 'ws://localhost:9090';
+        }
+    }
+
     function connect_to_ros() {
-        rosRef.current.connect('ws://localhost:9090');
+        const url = getRosBridgeUrl();
+        console.log(`[ROS] connecting to ${url}`);
+        rosRef.current.connect(url);
     }
 
     // on start up

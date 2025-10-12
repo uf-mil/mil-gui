@@ -1,6 +1,7 @@
 /**
  * SimulationControl
- * - Collapsible panel to publish fake sensor data for IMU/Depth/DVL at 10Hz
+ * - Collapsible panel to publish fake sensor data
+ * - IMU: ~20Hz, DVL: ~10Hz, Depth: ~16Hz (realistic rates)
  * - Provides scenarios (idle, dive, surface, forward, circle, wobble)
  * - Status-aware header and ROS bridge topic publishers
  */
@@ -28,7 +29,11 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
             return v ? v === '1' : false;
         } catch { return false; }
     });
-    const simulationRef = useRef<NodeJS.Timer | null>(null);
+    // Use drift-compensated timer for IMU to hit ~20Hz reliably in browsers
+    const imuTimerRef = useRef<number | null>(null);
+    const dvlTimerRef = useRef<NodeJS.Timer | null>(null);
+    const depthTimerRef = useRef<NodeJS.Timer | null>(null);
+    const stateTimerRef = useRef<NodeJS.Timer | null>(null);
     
     const { ros } = useRos();
     
@@ -86,29 +91,29 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
         };
     };
 
-    // Simulation scenarios
-    const runSimulationStep = () => {
+    // Simulation scenarios - update state based on scenario
+    const updateSimulationState = (dt: number) => {
         const state = simStateRef.current;
-        state.time += 0.1; // 100ms timestep
+        state.time += dt;
         
         // Apply scenario-specific motions
         switch (simulationScenario) {
             case 'dive':
                 state.velocity.z = -0.5; // Diving down
-                state.position.z += state.velocity.z * 0.1;
+                state.position.z += state.velocity.z * dt;
                 state.depth = -state.position.z;
                 break;
                 
             case 'surface':
                 state.velocity.z = 0.3; // Rising up
-                state.position.z += state.velocity.z * 0.1;
+                state.position.z += state.velocity.z * dt;
                 state.depth = -state.position.z;
                 if (state.depth < 0) state.depth = 0; // Can't go above surface
                 break;
                 
             case 'forward':
                 state.velocity.x = 1.0; // Moving forward
-                state.position.x += state.velocity.x * 0.1;
+                state.position.x += state.velocity.x * dt;
                 break;
                 
             case 'circle':
@@ -132,11 +137,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
                 state.velocity.y = 0;
                 state.velocity.z = 0;
         }
-        
-        // Add some realistic noise
+    };
+
+    // Publish IMU data (~20Hz)
+    const publishIMU = () => {
+        const state = simStateRef.current;
         const noise = () => (Math.random() - 0.5) * 0.01;
         
-        // Publish IMU data
         if (imuPublisher.current) {
             const quat = eulerToQuaternion(
                 state.orientation.roll + noise(),
@@ -156,15 +163,20 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
                     z: 9.81 + state.velocity.z * 0.1 + noise()
                 },
                 angular_velocity: {
-                    x: (state.orientation.roll - (simStateRef.current.orientation.roll || 0)) / 0.1 + noise(),
-                    y: (state.orientation.pitch - (simStateRef.current.orientation.pitch || 0)) / 0.1 + noise(),
-                    z: (state.orientation.yaw - (simStateRef.current.orientation.yaw || 0)) / 0.1 + noise()
+                    x: (state.orientation.roll - (simStateRef.current.orientation.roll || 0)) / 0.05 + noise(),
+                    y: (state.orientation.pitch - (simStateRef.current.orientation.pitch || 0)) / 0.05 + noise(),
+                    z: (state.orientation.yaw - (simStateRef.current.orientation.yaw || 0)) / 0.05 + noise()
                 }
             });
             imuPublisher.current.publish(imuMsg);
         }
+    };
+
+    // Publish Depth data (~16Hz)
+    const publishDepth = () => {
+        const state = simStateRef.current;
+        const noise = () => (Math.random() - 0.5) * 0.01;
         
-        // Publish depth data
         if (depthPublisher.current) {
             const depthMsg = new ROSLIB.Message({
                 header: {
@@ -184,8 +196,13 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
             });
             depthPublisher.current.publish(depthMsg);
         }
+    };
+
+    // Publish DVL data (~10Hz)
+    const publishDVL = () => {
+        const state = simStateRef.current;
+        const noise = () => (Math.random() - 0.5) * 0.01;
         
-        // Publish DVL data
         if (dvlPublisher.current) {
             const dvlMsg = new ROSLIB.Message({
                 header: {
@@ -210,13 +227,46 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
     // Start/stop simulation
     const toggleSimulation = () => {
         if (isSimulating) {
-            if (simulationRef.current) {
-                clearInterval(simulationRef.current);
-                simulationRef.current = null;
+            // Stop all sensor publishers and state updater
+            if (stateTimerRef.current) {
+                clearInterval(stateTimerRef.current);
+                stateTimerRef.current = null;
+            }
+            if (imuTimerRef.current !== null) {
+                window.clearTimeout(imuTimerRef.current);
+                imuTimerRef.current = null;
+            }
+            if (dvlTimerRef.current) {
+                clearInterval(dvlTimerRef.current);
+                dvlTimerRef.current = null;
+            }
+            if (depthTimerRef.current) {
+                clearInterval(depthTimerRef.current);
+                depthTimerRef.current = null;
             }
             setIsSimulating(false);
         } else {
-            simulationRef.current = setInterval(runSimulationStep, 100); // 10Hz
+            // Start state updater at high frequency
+            stateTimerRef.current = setInterval(() => updateSimulationState(0.02), 20); // 50Hz state updates
+            
+            // Start IMU with drift-compensated timer (~20Hz)
+            const imuPeriod = 50; // ms
+            const startIMULoop = () => {
+                let next = performance.now() + imuPeriod;
+                const tick = () => {
+                    publishIMU();
+                    const now = performance.now();
+                    // schedule next run compensating for drift
+                    next += imuPeriod;
+                    const delay = Math.max(0, next - now);
+                    imuTimerRef.current = window.setTimeout(tick, delay) as unknown as number;
+                };
+                imuTimerRef.current = window.setTimeout(tick, imuPeriod) as unknown as number;
+            };
+            startIMULoop();
+            // Start remaining publishers at their respective rates
+            dvlTimerRef.current = setInterval(publishDVL, 100);       // ~10Hz
+            depthTimerRef.current = setInterval(publishDepth, 62.5);  // ~16Hz
             setIsSimulating(true);
         }
     };
@@ -233,9 +283,10 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (simulationRef.current) {
-                clearInterval(simulationRef.current);
-            }
+            if (stateTimerRef.current) clearInterval(stateTimerRef.current);
+            if (imuTimerRef.current !== null) window.clearTimeout(imuTimerRef.current);
+            if (dvlTimerRef.current) clearInterval(dvlTimerRef.current);
+            if (depthTimerRef.current) clearInterval(depthTimerRef.current);
         };
     }, []);
 
@@ -287,7 +338,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
                 </div>
                 
                 <div className="simulation-info">
-                    <span>Publishing to /imu/data, /depth/pose, /dvl/odom at 10Hz</span>
+                    <span>Publishing to /imu/data (~20Hz), /dvl/odom (~10Hz), /depth/pose (~16Hz)</span>
                 </div>
             </div>
             </div>
