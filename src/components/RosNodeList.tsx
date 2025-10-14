@@ -2,43 +2,46 @@ import React, { useState, useEffect } from 'react';
 import ROSLIB from 'roslib'; 
 
 function RosNodeStatus() {
-    const expectedNodes = ['a', 'b', 'c']; // Replace this with the actual expected nodes
-    // const actualNodes = ['a', 'b', 'd']; // Use this for testing
+    const expectedNodes = ['depth_sensor_node', 'depth_to_pose', 'dvl_bridge_node', 'hydrophone_node','pid_controller',
+        'reset_localization_service','robot_state_publisher','ros_gz_bridge','rviz','subjugator_localization',
+        'subjugator_path_planner','subjugator_trajectory_planner','thruster_bridge_node','thruster_manager',
+        'thruster_manager','transform_listener_impl_5b676bf83270','transform_listener_impl_615e20107470','wrench_tuner']; // Replace this with the actual expected nodes
 
     const [runningNodes, setRunningNodes] = useState<string[]>([]);
     const rosBridgeUrl = 'http://localhost:3000'
     useEffect(() => {
-    const ros = new ROSLIB.Ros({
-        url: rosBridgeUrl
-    });
+        const ros = new ROSLIB.Ros({
+            url: rosBridgeUrl
+        });
 
-    ros.on('connection', () => {
-        console.log('Successfully connected to ROS bridge server.');
-    });
+        ros.on('connection', () => {
+            console.log('Successfully connected to ROS bridge server.');
+        });
 
-    ros.on('error', (error) => {
-        console.error('Error connecting to ROS bridge server: ', error);
-    });
+        ros.on('error', (error) => {
+            console.error('Error connecting to ROS bridge server: ', error);
+        });
 
-    ros.on('close', () => {
-        console.log('Connection to ROS bridge server closed.');
-    });
+        ros.on('close', () => {
+            console.log('Connection to ROS bridge server closed.');
+        });
 
-    const intervalId = setInterval(() => {
-        ros.getNodes(
-        (nodes: string[]) => {
-            setRunningNodes(nodes);
-        },
-        (error) => {
-            console.error('Failed to get ROS nodes:', error);
-        }
-        );
-    }, 2000);
+        const intervalId = setInterval(() => {
+            ros.getNodes(
+            (nodes: string[]) => {
+                console.log('Fetched Nodes:', nodes);
+                setRunningNodes(nodes);
+            },
+            (error) => {
+                console.error('Failed to get ROS nodes:', error);
+            }
+            );
+        }, 2000);
 
-    return () => {
-        clearInterval(intervalId);
-        ros.close();
-    };
+        return () => {
+            clearInterval(intervalId);
+            ros.close();
+        };
     }, []);
     const greenNodes = runningNodes.filter(node => expectedNodes.includes(node));
     const redNodes = expectedNodes.filter(node => !runningNodes.includes(node));
