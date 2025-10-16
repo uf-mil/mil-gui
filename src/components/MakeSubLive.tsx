@@ -118,7 +118,16 @@ function MakeSubLive() {
     const isButtonDisabled = isLocalizationRunning || state !== 'idle';
     const isProcessing = state !== 'idle' && state !== 'error' && state !== 'complete';
 
-    return <div>Make Sub Live Component - TODO: Add styling</div>;
+    return (
+        <div>
+            <h3>Make Sub Live</h3>
+            <p>Localization Status: {isLocalizationRunning ? 'Running' : 'Stopped'} (Hz: {odometryHz})</p>
+            <button onClick={handleMakeSubLive} disabled={isButtonDisabled}>
+                {isProcessing ? 'Processing...' : 'Make Sub Live'}
+            </button>
+            {statusMessage && <p>Status: {statusMessage}</p>}
+        </div>
+    );
 }
 
 export default MakeSubLive;
