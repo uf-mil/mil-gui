@@ -30,10 +30,14 @@ export function useTopic<T extends ROSMessageObject>(topicName: string, messageT
 
 
         intervalRef.current = setInterval(() => {
-            const topic_is_dead = timesRef.current.length === 0 || Date.now() - timesRef.current[timesRef.current.length - 1] > TOPIC_TIMEOUT_SECONDS * 1000
+            const topic_is_dead =
+                timesRef.current.length === 0 ||
+                Date.now() - timesRef.current[timesRef.current.length - 1] > TOPIC_TIMEOUT_SECONDS * 1000;
             if (topic_is_dead) {
-                timesRef.current = []
-                setHz(0)
+                timesRef.current = [];
+                setHz(0);
+                // Clear last message so dependent UI knows the topic is inactive
+                setMessage(null as any);
             }
         }, TOPIC_TIMEOUT_SECONDS * 1000);
 

@@ -7,6 +7,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { useRos } from './RosContext';
+import { useTopic } from '../hooks/useTopic';
 import * as ROSLIB from 'roslib';
 import './SimulationControl.css';
 
@@ -36,6 +37,17 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
     const stateTimerRef = useRef<NodeJS.Timer | null>(null);
     
     const { ros } = useRos();
+    // Data source selection
+    const [dataSource, setDataSource] = useState<'synthetic' | 'bag'>(() => {
+        try { return (localStorage.getItem('sim.source') as any) || 'synthetic'; } catch { return 'synthetic'; }
+    });
+    // Subscribe to topics for seeding
+    const [imuMsg] = useTopic<any>('/imu/data', 'sensor_msgs/Imu');
+    const [depthMsg] = useTopic<any>('/depth/pose', 'geometry_msgs/PoseWithCovarianceStamped');
+    const [dvlMsg] = useTopic<any>('/dvl/odom', 'nav_msgs/Odometry');
+    // Seeding feedback state
+    const [seededAt, setSeededAt] = useState<number | null>(null);
+    const [seedSummary, setSeedSummary] = useState<string>('');
     
     // Publishers for fake data
     const imuPublisher = useRef<ROSLIB.Topic | null>(null);
@@ -53,7 +65,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
 
     // Initialize publishers when connected
     useEffect(() => {
-        if (connected && ros) {
+        if (connected && ros && dataSource === 'synthetic') {
             imuPublisher.current = new ROSLIB.Topic({
                 ros: ros,
                 name: '/imu/data',
@@ -72,7 +84,12 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
                 messageType: 'nav_msgs/Odometry'
             });
         }
-    }, [connected, ros]);
+        if (connected && ros && dataSource === 'bag') {
+            if (imuPublisher.current) { imuPublisher.current.unadvertise(); imuPublisher.current = null; }
+            if (depthPublisher.current) { depthPublisher.current.unadvertise(); depthPublisher.current = null; }
+            if (dvlPublisher.current) { dvlPublisher.current.unadvertise(); dvlPublisher.current = null; }
+        }
+    }, [connected, ros, dataSource]);
 
     // Helper function to convert euler angles to quaternion
     const eulerToQuaternion = (roll: number, pitch: number, yaw: number) => {
@@ -89,6 +106,62 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
             y: cr * sp * cy + sr * cp * sy,
             z: cr * cp * sy - sr * sp * cy
         };
+    };
+
+    // Quaternion -> Euler (for seeding from IMU)
+    const quaternionToEuler = (x: number, y: number, z: number, w: number) => {
+        const sinr_cosp = 2 * (w * x + y * z);
+        const cosr_cosp = 1 - 2 * (x * x + y * y);
+        const roll = Math.atan2(sinr_cosp, cosr_cosp);
+
+        const sinp = 2 * (w * y - z * x);
+        const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * Math.PI / 2 : Math.asin(sinp);
+
+        const siny_cosp = 2 * (w * z + x * y);
+        const cosy_cosp = 1 - 2 * (y * y + z * z);
+        const yaw = Math.atan2(siny_cosp, cosy_cosp);
+        return { roll, pitch, yaw };
+    };
+
+    // Seed initial sim state from latest ROS topics
+    const seedFromRosTopics = () => {
+        const s = simStateRef.current;
+        let seededParts: string[] = [];
+
+        const q = (imuMsg as any)?.orientation;
+        if (q && typeof q.x === 'number' && typeof q.y === 'number' && typeof q.z === 'number' && typeof q.w === 'number') {
+            const e = quaternionToEuler(q.x, q.y, q.z, q.w);
+            s.orientation = { roll: e.roll, pitch: e.pitch, yaw: e.yaw };
+            seededParts.push('orientation from /imu/data');
+        }
+
+        const p = (depthMsg as any)?.pose?.pose?.position;
+        if (p && typeof p.z === 'number') {
+            s.position.z = p.z;
+            s.depth = -p.z; // assume z-up
+            seededParts.push('depth from /depth/pose');
+        }
+
+        const v = (dvlMsg as any)?.twist?.twist?.linear;
+        if (v && (typeof v.x === 'number' || typeof v.y === 'number' || typeof v.z === 'number')) {
+            s.velocity = { x: v.x ?? 0, y: v.y ?? 0, z: v.z ?? 0 };
+            seededParts.push('velocity from /dvl/odom');
+        }
+
+        if (seededParts.length === 0) {
+            setSeedSummary('No recent messages available to seed. Make sure rosbag2 is playing and topics are active.');
+            setSeededAt(Date.now());
+            return;
+        }
+
+        setSeedSummary(`Seeded ${seededParts.join(', ')}`);
+        setSeededAt(Date.now());
+        // Force a tiny state change to ensure any UI bound to sim state can reflect updates
+        // (simStateRef updates alone do not trigger a re-render)
+        // We reuse seedSummary/seededAt states above for this purpose.
+        // Optional: console for debugging
+        // eslint-disable-next-line no-console
+        console.log('[Simulation] Seeded from ROS topics:', { orientation: q, positionZ: p?.z, velocity: v });
     };
 
     // Simulation scenarios - update state based on scenario
@@ -226,6 +299,7 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
 
     // Start/stop simulation
     const toggleSimulation = () => {
+        if (dataSource === 'bag') return; // don't publish in bag mode
         if (isSimulating) {
             // Stop all sensor publishers and state updater
             if (stateTimerRef.current) {
@@ -280,6 +354,18 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
         try { localStorage.setItem('sim.expanded', isExpanded ? '1' : '0'); } catch {}
     }, [isExpanded]);
 
+    // Persist data source and stop timers when switching to bag
+    useEffect(() => {
+        try { localStorage.setItem('sim.source', dataSource); } catch {}
+        if (dataSource === 'bag' && isSimulating) {
+            if (stateTimerRef.current) { clearInterval(stateTimerRef.current); stateTimerRef.current = null; }
+            if (imuTimerRef.current !== null) { window.clearTimeout(imuTimerRef.current); imuTimerRef.current = null; }
+            if (dvlTimerRef.current) { clearInterval(dvlTimerRef.current); dvlTimerRef.current = null; }
+            if (depthTimerRef.current) { clearInterval(depthTimerRef.current); depthTimerRef.current = null; }
+            setIsSimulating(false);
+        }
+    }, [dataSource]);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -312,12 +398,24 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
             <div className={`simulation-content ${isExpanded ? 'expanded' : 'collapsed'}`}>
                 <div className="simulation-grid">
                     <div className="control-group">
+                        <label htmlFor="source-select">Data Source:</label>
+                        <select
+                            id="source-select"
+                            value={dataSource}
+                            onChange={(e) => setDataSource(e.target.value as 'synthetic' | 'bag')}
+                            className="scenario-select"
+                        >
+                            <option value="synthetic">Synthetic Simulation</option>
+                            <option value="bag">Bag Playback (listen only)</option>
+                        </select>
+                    </div>
+                    <div className="control-group">
                         <label htmlFor="scenario-select">Scenario:</label>
                         <select 
                             id="scenario-select"
                             value={simulationScenario} 
                             onChange={(e) => setSimulationScenario(e.target.value)}
-                            disabled={isSimulating}
+                            disabled={isSimulating || dataSource === 'bag'}
                             className="scenario-select"
                         >
                             <option value="idle">Idle (Stationary)</option>
@@ -329,17 +427,37 @@ const SimulationControl: React.FC<SimulationControlProps> = ({ connected }) => {
                         </select>
                     </div>
                     
-                    <button 
-                        onClick={toggleSimulation}
-                        className={`sim-toggle-btn ${isSimulating ? 'stop' : 'start'}`}
-                    >
-                        {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
-                    </button>
+                    {dataSource === 'synthetic' ? (
+                        <button 
+                            onClick={toggleSimulation}
+                            className={`sim-toggle-btn ${isSimulating ? 'stop' : 'start'}`}
+                        >
+                            {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={seedFromRosTopics}
+                            className="sim-toggle-btn start"
+                            disabled={!(imuMsg || depthMsg || dvlMsg)}
+                            title="Seed simulation state from current ROS topics"
+                        >
+                            Seed from ROS topics
+                        </button>
+                    )}
                 </div>
                 
                 <div className="simulation-info">
-                    <span>Publishing to /imu/data (~20Hz), /dvl/odom (~10Hz), /depth/pose (~16Hz)</span>
+                    {dataSource === 'synthetic' ? (
+                        <span>Publishing to /imu/data (~20Hz), /dvl/odom (~10Hz), /depth/pose (~16Hz)</span>
+                    ) : (
+                        <span>Listening to /imu/data, /dvl/odom, /depth/pose (run: ros2 bag play ...)</span>
+                    )}
                 </div>
+                {seededAt && (
+                    <div className="seed-info" style={{ marginTop: 6, fontSize: 12, color: seedSummary.startsWith('No recent') ? '#b00020' : '#2e7d32' }}>
+                        {seedSummary} — {new Date(seededAt).toLocaleTimeString()}
+                    </div>
+                )}
             </div>
             </div>
         </div>
