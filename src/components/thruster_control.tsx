@@ -4,14 +4,14 @@ import { useTopic } from "../hooks/useTopic";
 export default function ThrusterControl() {
   // ROS Topics
   const [_, __, cmdWrench] = useTopic("/cmd_wrench", "geometry_msgs/msg/Wrench");
-  const [___, ____, thrusterEfforts] = useTopic("/thruster_efforts", "custom_msgs/msg/ThrusterEfforts");
+  const [___, ____, thrusterEfforts] = useTopic("/thruster_efforts", "ThrusterEfforts");
 
   // Thruster Names
   const thrusterNames = [
     "thrust_flh",
     "thrust_frh",
     "thrust_blh",
-    "thrust_brh",
+    "thrust_bruh",
     "thrust_flv",
     "thrust_frv",
     "thrust_blv",
@@ -21,7 +21,7 @@ export default function ThrusterControl() {
   // State
   const [efforts, setEfforts] = useState<number[]>(Array(thrusterNames.length).fill(0));
 
-  // Command
+  // Command: Send Zero Wrench
   const sendZeroWrench = () => {
     cmdWrench.publish({
       force: { x: 0.0, y: 0.0, z: 0.0 },
@@ -30,6 +30,7 @@ export default function ThrusterControl() {
     console.log("Published zero wrench for safety");
   };
 
+  // Command: Send Thruster Efforts
   const sendThrusterEfforts = () => {
     thrusterEfforts.publish({ efforts });
     console.log("Sent thruster efforts:", efforts);
