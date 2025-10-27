@@ -54,9 +54,11 @@ function MakeSubLive() {
             }
 
             // Step 2: Wait for odometry to start publishing
-            setState('waiting_for_odometry');
-            setStatusMessage('Waiting for localization to start...');
-            await waitForOdometry();
+            if (odometryHz === 0) {
+                setState('waiting_for_odometry');
+                setStatusMessage('Waiting for localization to start...');
+                await waitForOdometry();
+            }
 
             // Step 3: Reset localization
             setState('resetting_localization');
@@ -100,18 +102,20 @@ function MakeSubLive() {
 
     const waitForOdometry = (): Promise<void> => {
         return new Promise((resolve, reject) => {
+            const startTime = Date.now();
+
             const checkInterval = setInterval(() => {
                 if (odometryHz > 0) {
                     clearInterval(checkInterval);
                     resolve();
                 }
-            }, 500); //check every 500ms
 
-            // Timeout after 30 seconds
-            setTimeout(() => {
-                clearInterval(checkInterval);
-                reject(new Error('Timeout waiting for localization to start'));
-            }, 30000);
+                // Timeout after 30 seconds
+                if (Date.now() - startTime > 30000) {
+                    clearInterval(checkInterval);
+                    reject(new Error('Timeout waiting for localization to start'));
+                }
+            }, 500);
         });
     };
 
