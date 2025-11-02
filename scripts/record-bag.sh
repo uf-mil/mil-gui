@@ -2,6 +2,9 @@
 # Helper script to record a test bag from the GUI's synthetic simulation
 # Usage: ./scripts/record-bag.sh [bag_name] [duration_seconds]
 
+# Source ROS2 setup
+source /opt/ros/humble/setup.bash
+
 BAG_NAME="${1:-pool_test_01}"
 DURATION="${2:-15}"
 BAG_DIR="$(cd "$(dirname "$0")/.." && pwd)/bags/${BAG_NAME}"
@@ -33,16 +36,35 @@ fi
 
 echo ""
 echo "Recording for ${DURATION} seconds..."
-echo "Press Ctrl+C to stop early."
+echo "Press Ctrl+C to stop recording."
 echo ""
 
-# Record with timeout
-timeout ${DURATION}s ros2 bag record \
+# Start recording in background and capture its PID
+ros2 bag record \
     /imu/data \
     /dvl/odom \
     /depth/pose \
-    -o "$BAG_DIR" \
-    || true
+    -o "$BAG_DIR" &
+
+RECORD_PID=$!
+
+# Function to kill the recording process
+cleanup() {
+    echo ""
+    echo "Stopping recording..."
+    kill $RECORD_PID 2>/dev/null
+    wait $RECORD_PID 2>/dev/null
+    echo "Recording stopped."
+}
+
+# Set up trap to catch Ctrl+C
+trap cleanup SIGINT SIGTERM
+
+# Wait for the specified duration
+sleep ${DURATION}
+
+# Stop recording
+cleanup
 
 echo ""
 echo "========================================="

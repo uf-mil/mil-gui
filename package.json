@@ -23,9 +23,9 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "bag:record": "wsl bash -c './scripts/record-bag.sh \"$@\"' --",
-    "bag:play": "wsl bash -c './scripts/play-bag.sh \"$@\"' --",
-    "bag:list": "wsl bash -c 'ls -lh bags/ 2>/dev/null || echo \"No bags found\"'"
+    "bag:record": "wsl bash ./scripts/record-bag.sh",
+    "bag:play": "wsl bash ./scripts/play-bag.sh",
+    "bag:list": "wsl bash -c \"mkdir -p bags && ls -lh bags/\""
   },
   "eslintConfig": {
     "extends": [

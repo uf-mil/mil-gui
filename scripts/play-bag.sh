@@ -2,6 +2,9 @@
 # Helper script to play back a recorded bag
 # Usage: ./scripts/play-bag.sh [bag_name] [rate]
 
+# Source ROS2 setup
+source /opt/ros/humble/setup.bash
+
 BAG_NAME="${1:-pool_test_01}"
 RATE="${2:-1.0}"
 BAG_DIR="$(cd "$(dirname "$0")/.." && pwd)/bags/${BAG_NAME}"

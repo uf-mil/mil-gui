@@ -7,7 +7,7 @@ Quick commands to record and play back ROS2 bags for testing the simulation GUI.
 ### 1. Record a test bag from the GUI
 
 ```powershell
-# In PowerShell (Windows)
+# In PowerShell (Windows) - default 15 seconds, saves to bags/pool_test_01
 npm run bag:record
 ```
 
@@ -18,13 +18,14 @@ This will:
 
 **Custom bag name and duration:**
 ```powershell
-npm run bag:record -- my_test_bag 30
+# Record to a custom bag name for 30 seconds
+wsl bash ./scripts/record-bag.sh my_test_bag 30
 ```
 
 ### 2. Play back a bag
 
 ```powershell
-# In PowerShell (Windows)
+# In PowerShell (Windows) - plays bags/pool_test_01 in loop
 npm run bag:play
 ```
 
@@ -34,7 +35,8 @@ This will:
 
 **Custom bag name and playback rate:**
 ```powershell
-npm run bag:play -- my_test_bag 2.0
+# Play custom bag at 2x speed
+wsl bash ./scripts/play-bag.sh my_test_bag 2.0
 ```
 
 ### 3. List available bags
