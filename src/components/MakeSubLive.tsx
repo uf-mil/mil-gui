@@ -1,3 +1,4 @@
+/*
 import React, { useState, useEffect } from 'react';
 import { useService } from '../hooks/useService';
 import { useTopic } from '../hooks/useTopic';
@@ -31,7 +32,7 @@ function MakeSubLive() {
     const [enableController, enableControllerResult] = useService<SetBoolRequest, SetBoolResponse>( '/pid_controller/enable', 'std_srvs/srv/SetBool' );
 
     // Check if localization is already running
-    const isLocalizationRunning = odometryHz > 0;
+    const isLocalizationRunning = odometryHz != null && odometryHz > 0;
     // Reset state when localization starts running
     useEffect(() => { 
         if (isLocalizationRunning && state === 'idle') {
@@ -54,7 +55,7 @@ function MakeSubLive() {
             }
 
             // Step 2: Wait for odometry to start publishing
-            if (odometryHz === 0) {
+            if (odometryHz == null || odometryHz === 0) {
                 setState('waiting_for_odometry');
                 setStatusMessage('Waiting for localization to start...');
                 await waitForOdometry();
@@ -105,7 +106,7 @@ function MakeSubLive() {
             const startTime = Date.now();
 
             const checkInterval = setInterval(() => {
-                if (odometryHz > 0) {
+                if (odometryHz != null && odometryHz > 0) {
                     clearInterval(checkInterval);
                     resolve();
                 }
@@ -125,7 +126,7 @@ function MakeSubLive() {
     return (
         <div>
             <h3>Make Sub Live</h3>
-            <p>Localization Status: {isLocalizationRunning ? 'Running' : 'Stopped'} (Hz: {odometryHz})</p>
+            <p>Localization Status: {isLocalizationRunning ? 'Running' : 'Stopped'} (Hz: {odometryHz ?? 0})</p>
             <button onClick={handleMakeSubLive} disabled={isButtonDisabled}>
                 {isProcessing ? 'Processing...' : 'Make Sub Live'}
             </button>
@@ -135,3 +136,4 @@ function MakeSubLive() {
 }
 
 export default MakeSubLive;
+*/
