@@ -2,30 +2,16 @@ import React, { useState, useEffect } from 'react';
 import ROSLIB from 'roslib'; 
 
 function RosNodeStatus() {
-    const expectedNodes = ['/depth_driver',
-'/front_cam',
-'/hardsoft_compensator',
-'/launch_ros_5783',
-'/magnetic_compensation_container',
-'/pid_controller',
-'/pingpublisher',
-'/reset_localization_service',
-'/robot_state_publisher',
-'/rosapi',
-'/rosbridge_websocket',
-'/subjugator_localization',
-'/subjugator_path_planner',
-'/subjugator_trajectory_planner',
-'/thrust_and_kill_board',
-'/thruster_manager',
-'/thruster_manager',
-'/transform_listener_impl_aaab08838300',
-'/vectornav',
-'/vn_sensor_msgs',
-'/waterlinked_dvl_driver']; // Replace this with the actual expected nodes
+const expectedNodes = ['depth_driver', 'front_cam', 'hardsoft_compensator', 
+    'launch_ros_5783', 'magnetic_compensation_container', 'pid_controller', 
+    'pingpublisher', 'reset_localization_service', 'robot_state_publisher', 
+    'subjugator_localization', 'subjugator_path_planner', 
+    'subjugator_trajectory_planner', 'thrust_and_kill_board', 'thruster_manager',
+    'transform_listener_impl_aaab08838300', 'vectornav', 'vn_sensor_msgs', 
+    'waterlinked_dvl_driver', '/rosapi', '/rosbridge_websocket'];
 
     const [runningNodes, setRunningNodes] = useState<string[]>([]);
-    const rosBridgeUrl = 'ws://localhost:9090'
+    const rosBridgeUrl = `ws://${window.location.hostname}:9090`
     useEffect(() => {
         const ros = new ROSLIB.Ros({
             url: rosBridgeUrl
