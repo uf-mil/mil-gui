@@ -6,6 +6,7 @@ import { PoseWithCovarianceStamped } from '../ros_msg_types/geometry_msgs'
 import { Odometry } from '../ros_msg_types/nav_msgs';
 import { Imu } from '../ros_msg_types/sensor_msgs';
 import SimulationControl from './SimulationControl';
+import CameraFeed from './CameraFeed';
 
 /*
     *
@@ -99,6 +100,8 @@ function Preflight() {
                     </div>
                     <div className='depth-log'>{`depth: ${depth_msg?.pose.pose.position.z}`}</div>
                 </div>
+
+                <CameraFeed />
             </div>
 
         </>
