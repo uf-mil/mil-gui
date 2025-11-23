@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ROSLIB from 'roslib';
 import { useRos } from './RosContext';
 
 interface CameraFeedProps {
@@ -7,7 +8,7 @@ interface CameraFeedProps {
 }
 
 function CameraFeed({ 
-    topicName = '/front_cam/image_compressed', 
+    topicName = '/camera/image/compressed', 
     cameraLabel = 'Front Camera' 
 }: CameraFeedProps) {
     const { ros, connected } = useRos();
@@ -42,7 +43,28 @@ function CameraFeed({
         transition: 'all 0.2s ease-in-out'
     };
 
-    // TODO: Subscribe to the camera topic
+    useEffect(() => {
+        if (!connected || !ros || !isCameraEnabled){
+            return;
+        }
+
+        const cameraTopic = new ROSLIB.Topic({
+            ros: ros,
+            name: topicName,
+            messageType: 'sensor_msgs/CompressedImage' 
+        });
+        const handleMessage = (message: any) => {
+            setImageData(`data:image/jpeg;base64,${message.data}`);
+        };
+        console.log(`Subscribing to ${topicName}`);
+        cameraTopic.subscribe(handleMessage);
+        return () => {
+            console.log(`Unsubscribing from ${topicName}`);
+            cameraTopic.unsubscribe();
+            setImageData(null);
+        };
+    }, [ros, connected, isCameraEnabled, topicName]);
+
 
     return (
         <div>
@@ -60,10 +82,10 @@ function CameraFeed({
             </button>
             
             {!connected && (
-                <p style={{ color: 'gray' }}>📹 Waiting for camera feed...</p>
+                <p style={{ color: 'gray' }}>⚠️ ROS is not connected.</p>
             )}
             
-            {connected && !imageData && (
+            {connected && isCameraEnabled && !imageData && (
                 <p style={{ color: 'gray' }}>📹 Waiting for camera feed...</p>
             )}
             
@@ -78,20 +100,22 @@ function CameraFeed({
                     }} 
                 />
             )}
-            
-            <div style={{ 
-                backgroundColor: '#f0f0f0', 
-                padding: '20px', 
-                textAlign: 'center',
-                color: '#666'
-            }}>
-                <p>🚧 Camera feed component placeholder</p>
-                <p style={{ fontSize: '12px' }}>
-                    This is where the camera feed will appear!
-                    <br />
-                    Next step: Implement topic subscription
-                </p>
-            </div>
+            {(!isCameraEnabled || !imageData) && (
+                <div style={{ 
+                    backgroundColor: '#f0f0f0', 
+                    padding: '20px', 
+                    textAlign: 'center',
+                    color: '#666',
+                    marginTop: '10px' // Added some spacing
+                }}>
+                    <p>🚧 Camera feed component placeholder</p>
+                    <p style={{ fontSize: '12px' }}>
+                        This is where the camera feed will appear!
+                        <br />
+                        Next step: Implement topic subscription
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
