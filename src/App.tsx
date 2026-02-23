@@ -7,6 +7,7 @@ import CameraFeed from './components/CameraFeed';
 import LaunchChecklistPanel from './components/LaunchChecklistPanel';
 import { RosProvider } from './components/RosContext';
 import RosNodeStatus from './components/RosNodeList';
+import ThrusterSpinPanel from './components/ThrusterSpinPanel';
 import { launchChecklistConfig } from './config/launchChecklistConfig';
 import { useChecklistState } from './hooks/useChecklistState';
 import { useRosGraph } from './hooks/useRosGraph';
@@ -28,6 +29,7 @@ function AppContent() {
                 config={launchChecklistConfig.camera}
                 availableTopics={rosGraph.runningTopics}
             />
+            <ThrusterSpinPanel config={launchChecklistConfig} />
             <div className="App">
                 <Preflight />
                 <ServiceExample />
