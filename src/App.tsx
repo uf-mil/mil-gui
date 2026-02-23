@@ -3,21 +3,25 @@ import './App.css';
 
 import Preflight from './components/preflight';
 import ServiceExample from './components/ServiceExample';
+import LaunchChecklistPanel from './components/LaunchChecklistPanel';
 import { RosProvider } from './components/RosContext';
 import RosNodeStatus from './components/RosNodeList';
 import { launchChecklistConfig } from './config/launchChecklistConfig';
+import { useChecklistState } from './hooks/useChecklistState';
 import { useRosGraph } from './hooks/useRosGraph';
 
 function AppContent() {
     const rosGraph = useRosGraph(launchChecklistConfig);
+    const checklist = useChecklistState(launchChecklistConfig, rosGraph);
 
     return (
         <>
+            <LaunchChecklistPanel config={launchChecklistConfig} checklist={checklist} />
             <RosNodeStatus
                 rosGraph={rosGraph}
                 requiredNodes={launchChecklistConfig.requiredNodes}
                 requiredServices={launchChecklistConfig.requiredServices}
-                launchBlockReasons={rosGraph.dependencyBlockReasons}
+                launchBlockReasons={checklist.launchBlockReasons}
             />
             <div className="App">
                 <Preflight />
