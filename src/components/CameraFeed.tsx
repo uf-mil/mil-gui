@@ -7,6 +7,7 @@ import { RosTopicInfo } from '../hooks/useRosGraph';
 interface CameraFeedProps {
     config?: LaunchChecklistConfig['camera'];
     availableTopics?: RosTopicInfo[];
+    forceTestPattern?: boolean;
 }
 
 function getStampMs(message: Record<string, unknown>): number | null {
@@ -75,6 +76,7 @@ function buildTestPatternDataUrl(): string {
 function CameraFeed({
     config = launchChecklistConfig.camera,
     availableTopics = [],
+    forceTestPattern = false,
 }: CameraFeedProps) {
     const { ros, connected } = useRos();
 
@@ -109,6 +111,13 @@ function CameraFeed({
     const activeTopicType = manualTopicType.trim().length > 0
         ? manualTopicType.trim()
         : (topicTypesByName.get(activeTopicName) ?? config.defaultTopicType);
+
+    useEffect(() => {
+        if (forceTestPattern) {
+            setStreamEnabled(false);
+            setTestPatternEnabled(true);
+        }
+    }, [forceTestPattern]);
 
     useEffect(() => {
         if (testPatternEnabled) {
@@ -225,7 +234,10 @@ function CameraFeed({
                     />
                 </label>
 
-                <button onClick={() => setStreamEnabled((previous) => !previous)} disabled={!connected}>
+                <button
+                    onClick={() => setStreamEnabled((previous) => !previous)}
+                    disabled={!connected || forceTestPattern}
+                >
                     {streamEnabled ? 'Disable Stream' : 'Enable Stream'}
                 </button>
                 {config.enableTestPattern && (

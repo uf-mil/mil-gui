@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LaunchChecklistConfig } from '../config/launchChecklistConfig';
 import { ChecklistState } from '../hooks/useChecklistState';
 
@@ -9,6 +9,14 @@ interface LaunchChecklistPanelProps {
 
 function LaunchChecklistPanel({ config, checklist }: LaunchChecklistPanelProps) {
     const [actionMessage, setActionMessage] = useState<string>('');
+    const [makeSubLiveMessage, setMakeSubLiveMessage] = useState<string>('');
+    const [makeSubLiveRunning, setMakeSubLiveRunning] = useState<boolean>(false);
+    const [makeSubLiveStep, setMakeSubLiveStep] = useState<number>(-1);
+
+    const stepStateRef = useRef(checklist.stepState);
+    useEffect(() => {
+        stepStateRef.current = checklist.stepState;
+    }, [checklist.stepState]);
 
     const runAction = async (label: string, fn: () => Promise<void>) => {
         try {
@@ -21,6 +29,72 @@ function LaunchChecklistPanel({ config, checklist }: LaunchChecklistPanelProps) 
     };
 
     const { stepState, controllerState, buttonStates, actionStates } = checklist;
+
+    const makeSubLiveSteps = [
+        'Start localization',
+        'Wait for odometry',
+        'Reset localization',
+        'Start controller',
+    ];
+
+    const makeSubLiveDisabled =
+        !checklist.connected
+        || makeSubLiveRunning
+        || stepState.localizationRunning
+        || buttonStates.startLocalizationDisabled
+        || actionStates.resetLocalization.isLoading
+        || actionStates.startController.isLoading;
+
+    const waitForLocalizationStart = async (timeoutMs: number): Promise<boolean> => {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < timeoutMs) {
+            if (stepStateRef.current.localizationRunning) {
+                return true;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        return false;
+    };
+
+    const makeSubLive = async () => {
+        if (stepStateRef.current.localizationRunning) {
+            setMakeSubLiveMessage('Localization is already running. Stop it before using Make Sub Live.');
+            return;
+        }
+
+        setMakeSubLiveRunning(true);
+        setMakeSubLiveStep(0);
+        setMakeSubLiveMessage('Starting localization...');
+
+        try {
+            await checklist.handlers.startLocalization();
+
+            setMakeSubLiveStep(1);
+            const started = await waitForLocalizationStart(10000);
+            if (!started) {
+                throw new Error('Localization did not start within 10 seconds');
+            }
+
+            setMakeSubLiveStep(2);
+            setMakeSubLiveMessage('Resetting localization...');
+            await checklist.handlers.resetLocalization();
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            setMakeSubLiveStep(3);
+            setMakeSubLiveMessage('Starting controller...');
+            await checklist.handlers.startController();
+
+            setMakeSubLiveMessage('Sub is live. Controller started.');
+            setMakeSubLiveStep(makeSubLiveSteps.length);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Make Sub Live failed';
+            setMakeSubLiveMessage(`Make Sub Live failed: ${message}`);
+            setMakeSubLiveStep(-1);
+        } finally {
+            setMakeSubLiveRunning(false);
+        }
+    };
 
     return (
         <section className="launch-checklist-panel">
@@ -61,6 +135,41 @@ function LaunchChecklistPanel({ config, checklist }: LaunchChecklistPanelProps) 
             <p className="checklist-subtext">
                 Complete steps 1-4 manually. Launch Sub (step 5) is the final action and does not auto-run prerequisites.
             </p>
+
+            <div className="checklist-step">
+                <button
+                    className="launch-button"
+                    onClick={makeSubLive}
+                    disabled={makeSubLiveDisabled}
+                >
+                    Make Sub Live (Auto)
+                </button>
+                <span className="step-meta">
+                    Starts localization, waits for odometry, resets localization, then starts controller.
+                </span>
+                {stepState.localizationRunning && (
+                    <span className="step-error">Localization already running; auto-start is disabled.</span>
+                )}
+                <div className="make-sub-live-progress">
+                    <div className="progress-bar">
+                        <div
+                            className="progress-fill"
+                            style={{ width: `${Math.max(0, makeSubLiveStep + 1) / makeSubLiveSteps.length * 100}%` }}
+                        />
+                    </div>
+                    <div className="progress-steps">
+                        {makeSubLiveSteps.map((label, index) => (
+                            <span
+                                key={label}
+                                className={index <= makeSubLiveStep ? 'progress-step active' : 'progress-step'}
+                            >
+                                {label}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+                {makeSubLiveMessage && <span className="step-meta">{makeSubLiveMessage}</span>}
+            </div>
 
             <div className="checklist-steps">
                 <div className="checklist-step">
