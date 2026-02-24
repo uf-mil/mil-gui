@@ -30,7 +30,11 @@ function AppContent() {
                 config={launchChecklistConfig.camera}
                 availableTopics={rosGraph.runningTopics}
             />
-            <ThrusterSpinPanel config={launchChecklistConfig} availableTopics={rosGraph.runningTopics} />
+            <ThrusterSpinPanel
+                config={launchChecklistConfig}
+                availableTopics={rosGraph.runningTopics}
+                availableServices={rosGraph.runningServices}
+            />
             <section className="legacy-controls">
                 <button
                     className={showLegacyPanels ? 'secondary-button active' : 'secondary-button'}

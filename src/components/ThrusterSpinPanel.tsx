@@ -9,6 +9,7 @@ import { RosTopicInfo } from '../hooks/useRosGraph';
 interface ThrusterSpinPanelProps {
     config: LaunchChecklistConfig;
     availableTopics: RosTopicInfo[];
+    availableServices: string[];
 }
 
 function createZeroWrenchMessage(): Record<string, Record<string, number>> {
@@ -23,9 +24,16 @@ function isValidRosMessageType(type: string): boolean {
     return value.length > 0 && value.includes('/');
 }
 
+function normalizeName(name: string): string {
+    return name.startsWith('/') ? name.slice(1) : name;
+}
+
 function resolveTopicSpec(spec: TopicSpec, availableTopicsByName: Map<string, string>): TopicSpec | null {
     const discoveredType = availableTopicsByName.get(spec.name);
-    const resolvedType = discoveredType ?? spec.type;
+    if (!discoveredType) {
+        return null;
+    }
+    const resolvedType = discoveredType;
 
     if (!isValidRosMessageType(resolvedType)) {
         return null;
@@ -37,7 +45,7 @@ function resolveTopicSpec(spec: TopicSpec, availableTopicsByName: Map<string, st
     };
 }
 
-function ThrusterSpinPanel({ config, availableTopics }: ThrusterSpinPanelProps) {
+function ThrusterSpinPanel({ config, availableTopics, availableServices }: ThrusterSpinPanelProps) {
     const { ros, connected } = useRos();
 
     const [callKill, killService] = useService<Record<string, unknown>, Record<string, unknown>>(
@@ -62,9 +70,17 @@ function ThrusterSpinPanel({ config, availableTopics }: ThrusterSpinPanelProps) 
         [availableTopicsByName, config.thrusters.zeroWrenchTopic]
     );
 
-    const thrusterActivity = useTopicActivity(
-        resolvedThrusterTopic ? [resolvedThrusterTopic] : []
-    )[0];
+    const thrusterActivitySpecs = useMemo(
+        () => (resolvedThrusterTopic ? [resolvedThrusterTopic] : []),
+        [resolvedThrusterTopic]
+    );
+
+    const thrusterActivity = useTopicActivity(thrusterActivitySpecs)[0];
+
+    const killServiceAvailable = useMemo(() => {
+        const set = new Set(availableServices.map(normalizeName));
+        return set.has(normalizeName(config.actions.kill.name));
+    }, [availableServices, config.actions.kill.name]);
 
     const [selectedThrusters, setSelectedThrusters] = useState<Record<string, boolean>>(() => {
         const initial: Record<string, boolean> = {};
@@ -292,7 +308,11 @@ function ThrusterSpinPanel({ config, availableTopics }: ThrusterSpinPanelProps) 
                 <button onClick={stopSpin} disabled={!isSpinning}>
                     STOP
                 </button>
-                <button className="kill-button" onClick={triggerKill} disabled={killService.isLoading}>
+                <button
+                    className="kill-button"
+                    onClick={triggerKill}
+                    disabled={killService.isLoading || !killServiceAvailable}
+                >
                     KILL
                 </button>
             </div>
@@ -302,9 +322,15 @@ function ThrusterSpinPanel({ config, availableTopics }: ThrusterSpinPanelProps) 
                 <p>
                     Resolved thruster topic type: {resolvedThrusterTopic?.type ?? 'unresolved'}
                 </p>
+                <p>Kill service available: {killServiceAvailable ? 'yes' : 'no'}</p>
                 {(!resolvedThrusterTopic || !resolvedZeroWrenchTopic) && (
                     <p className="step-error">
                         Thruster test disabled: could not resolve topic types from ROS graph.
+                    </p>
+                )}
+                {!killServiceAvailable && (
+                    <p className="step-error">
+                        Kill action unavailable: missing service {config.actions.kill.name}
                     </p>
                 )}
                 {isSpinning && <p>Time remaining: {timeRemainingSec.toFixed(2)}s</p>}
