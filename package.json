@@ -25,7 +25,8 @@
     "eject": "react-scripts eject",
     "bag:record": "wsl bash ./scripts/record-bag.sh",
     "bag:play": "wsl bash ./scripts/play-bag.sh",
-    "bag:list": "wsl bash -c \"mkdir -p bags && ls -lh bags/\""
+    "bag:list": "wsl bash -c \"mkdir -p bags && ls -lh bags/\"",
+    "mil2:health": "wsl bash -lc \"source /opt/ros/jazzy/setup.bash; cd ~/mil2 || exit 1; [ -f install/setup.bash ] && source install/setup.bash; echo '--- nodes ---'; ros2 node list; echo '--- services (launch flow) ---'; ros2 service list | grep -E 'unkill|subjugator_localization|pid_controller' || true; echo '--- topics (launch flow) ---'; ros2 topic list | grep -E 'odometry/filtered|thruster_efforts|cmd_wrench|image|compressed' || true;\""
   },
   "eslintConfig": {
     "extends": [

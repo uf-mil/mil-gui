@@ -76,6 +76,15 @@ body {
   gap: 16px;
 }
 
+.legacy-controls {
+  display: flex;
+  justify-content: center;
+}
+
+.legacy-panels {
+  margin-top: 0;
+}
+
 .launch-checklist-panel,
 .dependency-panel,
 .camera-panel,
@@ -190,6 +199,13 @@ body {
   color: var(--bad);
 }
 
+.info-list {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+  color: #3f5a73;
+  font-size: 0.9rem;
+}
+
 .step-meta {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -289,6 +305,16 @@ body {
 .camera-status-text {
   margin: 6px 0 10px 0;
   color: var(--text-muted);
+}
+
+.secondary-button {
+  background: #eef3f8 !important;
+  color: #1f3f5b !important;
+  border-color: #8ea4b9 !important;
+}
+
+.secondary-button.active {
+  background: #d9e8f5 !important;
 }
 
 .camera-frame-wrap {

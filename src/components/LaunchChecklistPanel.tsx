@@ -49,6 +49,13 @@ function LaunchChecklistPanel({ config, checklist }: LaunchChecklistPanelProps) 
                     </div>
                 )}
             </div>
+            {controllerState.diagnostics.length > 0 && (
+                <ul className="info-list">
+                    {controllerState.diagnostics.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
+                </ul>
+            )}
 
             <h2>Launch the Sub Checklist</h2>
             <p className="checklist-subtext">

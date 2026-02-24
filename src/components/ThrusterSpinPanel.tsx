@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ROSLIB from 'roslib';
 import { useRos } from './RosContext';
-import { LaunchChecklistConfig } from '../config/launchChecklistConfig';
+import { LaunchChecklistConfig, TopicSpec } from '../config/launchChecklistConfig';
 import { useService } from '../hooks/useService';
 import { useTopicActivity } from '../hooks/useTopicActivity';
+import { RosTopicInfo } from '../hooks/useRosGraph';
 
 interface ThrusterSpinPanelProps {
     config: LaunchChecklistConfig;
+    availableTopics: RosTopicInfo[];
 }
 
 function createZeroWrenchMessage(): Record<string, Record<string, number>> {
@@ -16,7 +18,26 @@ function createZeroWrenchMessage(): Record<string, Record<string, number>> {
     };
 }
 
-function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
+function isValidRosMessageType(type: string): boolean {
+    const value = type.trim();
+    return value.length > 0 && value.includes('/');
+}
+
+function resolveTopicSpec(spec: TopicSpec, availableTopicsByName: Map<string, string>): TopicSpec | null {
+    const discoveredType = availableTopicsByName.get(spec.name);
+    const resolvedType = discoveredType ?? spec.type;
+
+    if (!isValidRosMessageType(resolvedType)) {
+        return null;
+    }
+
+    return {
+        ...spec,
+        type: resolvedType,
+    };
+}
+
+function ThrusterSpinPanel({ config, availableTopics }: ThrusterSpinPanelProps) {
     const { ros, connected } = useRos();
 
     const [callKill, killService] = useService<Record<string, unknown>, Record<string, unknown>>(
@@ -24,7 +45,26 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
         config.actions.kill.type
     );
 
-    const thrusterActivity = useTopicActivity([config.thrusters.topic])[0];
+    const availableTopicsByName = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const topic of availableTopics) {
+            map.set(topic.name, topic.type);
+        }
+        return map;
+    }, [availableTopics]);
+
+    const resolvedThrusterTopic = useMemo(
+        () => resolveTopicSpec(config.thrusters.topic, availableTopicsByName),
+        [availableTopicsByName, config.thrusters.topic]
+    );
+    const resolvedZeroWrenchTopic = useMemo(
+        () => resolveTopicSpec(config.thrusters.zeroWrenchTopic, availableTopicsByName),
+        [availableTopicsByName, config.thrusters.zeroWrenchTopic]
+    );
+
+    const thrusterActivity = useTopicActivity(
+        resolvedThrusterTopic ? [resolvedThrusterTopic] : []
+    )[0];
 
     const [selectedThrusters, setSelectedThrusters] = useState<Record<string, boolean>>(() => {
         const initial: Record<string, boolean> = {};
@@ -46,20 +86,20 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
     const startedAtRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!connected || !ros || !ros.isConnected) {
+        if (!connected || !ros || !ros.isConnected || !resolvedThrusterTopic || !resolvedZeroWrenchTopic) {
             return;
         }
 
         thrusterTopicRef.current = new ROSLIB.Topic({
             ros,
-            name: config.thrusters.topic.name,
-            messageType: config.thrusters.topic.type,
+            name: resolvedThrusterTopic.name,
+            messageType: resolvedThrusterTopic.type,
         });
 
         zeroWrenchTopicRef.current = new ROSLIB.Topic({
             ros,
-            name: config.thrusters.zeroWrenchTopic.name,
-            messageType: config.thrusters.zeroWrenchTopic.type,
+            name: resolvedZeroWrenchTopic.name,
+            messageType: resolvedZeroWrenchTopic.type,
         });
 
         return () => {
@@ -73,7 +113,7 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
                 zeroWrenchTopicRef.current = null;
             }
         };
-    }, [config.thrusters.topic.name, config.thrusters.topic.type, config.thrusters.zeroWrenchTopic.name, config.thrusters.zeroWrenchTopic.type, connected, ros]);
+    }, [connected, resolvedThrusterTopic, resolvedZeroWrenchTopic, ros]);
 
     const selectedCount = useMemo(
         () => Object.values(selectedThrusters).filter(Boolean).length,
@@ -133,8 +173,8 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
     const startSpin = () => {
         const boundedDuration = Math.min(config.thrusters.maxDurationSeconds, Math.max(0.1, durationSeconds));
 
-        if (!connected || !thrusterTopicRef.current) {
-            setStatusMessage('Cannot start spin: ROS is disconnected');
+        if (!connected || !thrusterTopicRef.current || !resolvedThrusterTopic || !resolvedZeroWrenchTopic) {
+            setStatusMessage('Cannot start spin: thruster topic/type is unavailable');
             return;
         }
 
@@ -243,7 +283,10 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
             </div>
 
             <div className="thruster-actions">
-                <button onClick={startSpin} disabled={isSpinning || !connected}>
+                <button
+                    onClick={startSpin}
+                    disabled={isSpinning || !connected || !resolvedThrusterTopic || !resolvedZeroWrenchTopic}
+                >
                     Start Spin
                 </button>
                 <button onClick={stopSpin} disabled={!isSpinning}>
@@ -256,6 +299,14 @@ function ThrusterSpinPanel({ config }: ThrusterSpinPanelProps) {
 
             <div className="thruster-feedback">
                 <p>Status: {statusMessage}</p>
+                <p>
+                    Resolved thruster topic type: {resolvedThrusterTopic?.type ?? 'unresolved'}
+                </p>
+                {(!resolvedThrusterTopic || !resolvedZeroWrenchTopic) && (
+                    <p className="step-error">
+                        Thruster test disabled: could not resolve topic types from ROS graph.
+                    </p>
+                )}
                 {isSpinning && <p>Time remaining: {timeRemainingSec.toFixed(2)}s</p>}
                 <p>
                     Thruster topic activity: {thrusterActivity?.ageSec !== null && thrusterActivity?.ageSec !== undefined

@@ -106,7 +106,7 @@ function parseKillStateFromMessage(message: Record<string, unknown> | null): Kil
 export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGraphState): ChecklistState {
     const { connected } = useRos();
 
-    const controllerState = useControllerState(config.controller);
+    const controllerState = useControllerState(config.controller, rosGraph.runningTopics);
     const [, localizationHz] = useTopic<Record<string, unknown>>(
         config.localization.odomTopic.name,
         config.localization.odomTopic.type
