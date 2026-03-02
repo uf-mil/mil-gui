@@ -21,20 +21,26 @@ export function RosProvider({ children }: RosProviderProps) {
     const [connected, setConnected] = useState<boolean>(false);
 
     const rosRef = useRef<ROSLIB.Ros>(ros);
-    rosRef.current.on('connection', function() {
-        console.log('Connected to ROS!');
-        setConnected(true);
-    });
+    useEffect(() => {
+        const handleConnection = () => {
+            console.log('Connected to ROS!');
+            setConnected(true);
+        };
 
-    rosRef.current.on('error', function(error) {
-        console.log('ROS connection error:', error);
-        setConnected(false);
-    });
+        const handleError = (error: unknown) => {
+            console.log('ROS connection error:', error);
+            setConnected(false);
+        };
 
-    rosRef.current.on('close', function() {
-        console.log('ROS connection closed');
-        setConnected(false);
-    });
+        const handleClose = () => {
+            console.log('ROS connection closed');
+            setConnected(false);
+        };
+
+        rosRef.current.on('connection', handleConnection);
+        rosRef.current.on('error', handleError);
+        rosRef.current.on('close', handleClose);
+    }, []);
 
 
     /**

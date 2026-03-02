@@ -1,94 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import ROSLIB from 'roslib'; 
+import React, { useMemo } from 'react';
+import { RequiredServiceSpec } from '../config/launchChecklistConfig';
+import { RosGraphState } from '../hooks/useRosGraph';
 
-function RosNodeStatus() {
-const expectedNodes = ['depth_driver', 'front_cam', 'hardsoft_compensator', 
-    'launch_ros_5783', 'magnetic_compensation_container', 'pid_controller', 
-    'pingpublisher', 'reset_localization_service', 'robot_state_publisher', 
-    'subjugator_localization', 'subjugator_path_planner', 
-    'subjugator_trajectory_planner', 'thrust_and_kill_board', 'thruster_manager',
-    'transform_listener_impl_aaab08838300', 'vectornav', 'vn_sensor_msgs', 
-    'waterlinked_dvl_driver', '/rosapi', '/rosbridge_websocket'];
+interface RosDependencyPanelProps {
+    rosGraph: RosGraphState;
+    requiredNodes: string[];
+    requiredServices: RequiredServiceSpec[];
+    launchBlockReasons: string[];
+}
 
-    const [runningNodes, setRunningNodes] = useState<string[]>([]);
-    const rosBridgeUrl = `ws://${window.location.hostname}:9090`
-    useEffect(() => {
-        const ros = new ROSLIB.Ros({
-            url: rosBridgeUrl
-        });
-
-        ros.on('connection', () => {
-            console.log('Successfully connected to ROS bridge server.');
-        });
-
-        ros.on('error', (error) => {
-            console.error('Error connecting to ROS bridge server: ', error);
-        });
-
-        ros.on('close', () => {
-            console.log('Connection to ROS bridge server closed.');
-        });
-
-        const intervalId = setInterval(() => {
-            ros.getNodes(
-            (nodes: string[]) => {
-                console.log('Fetched Nodes:', nodes);
-                setRunningNodes(nodes);
-            },
-            (error) => {
-                console.error('Failed to get ROS nodes:', error);
-            }
-            );
-        }, 2000);
-
-        return () => {
-            clearInterval(intervalId);
-            ros.close();
-        };
-    }, []);
-    const greenNodes = runningNodes.filter(node => expectedNodes.includes(node));
-    const redNodes = expectedNodes.filter(node => !runningNodes.includes(node));
-    const yellowNodes = runningNodes.filter(node => !expectedNodes.includes(node));
+function renderList(items: string[], emptyText: string): React.ReactNode {
+    if (items.length === 0) {
+        return <li>{emptyText}</li>;
+    }
 
     return (
-        <div style={{ fontFamily: 'sans-serif', display: 'flex', justifyContent: 'space-around' }}>
-        {/* Green Box */}
-        <div style={{ border: '1px solid #2e7d32', borderRadius: '8px', padding: '10px', backgroundColor: '#e8f5e9', width: '30%' }}>
-            <h2 style={{ color: '#2e7d32' }}>Running</h2>
-            <ul>
-                {greenNodes.length > 0 ? (
-                greenNodes.map(node => <li key={node}>{node}</li>)
-                ) : (
-                <li>None</li>
-                )}
-            </ul>
-        </div>
+        <>
+            {items.map((item) => (
+                <li key={item}>{item}</li>
+            ))}
+        </>
+    );
+}
 
-      {/* Red Box */}
-        <div style={{ border: '1px solid #c62828', borderRadius: '8px', padding: '10px', backgroundColor: '#ffebee', width: '30%' }}>
-            <h2 style={{ color: '#c62828' }}>Missing</h2>
-            <ul>
-                {redNodes.length > 0 ? (
-                redNodes.map(node => <li key={node}>{node}</li>)
-                ) : (
-                <li>None</li>
-                )}
-            </ul>
-        </div>
+function RosNodeStatus({
+    rosGraph,
+    requiredNodes,
+    requiredServices,
+    launchBlockReasons,
+}: RosDependencyPanelProps) {
+    const runningRequiredNodes = useMemo(
+        () => requiredNodes.filter((node) => !rosGraph.missingRequiredNodes.includes(node)),
+        [requiredNodes, rosGraph.missingRequiredNodes]
+    );
 
-      {/* Yellow Box */}
-        <div style={{ border: '1px solid #f9a825', borderRadius: '8px', padding: '10px', backgroundColor: '#fffde7', width: '30%' }}>
-            <h2 style={{ color: '#f9a825' }}>Unexpected</h2>
-            <ul>
-                {yellowNodes.length > 0 ? (
-                yellowNodes.map(node => <li key={node}>{node}</li>)
-                ) : (
-                <li>None</li>
-                )}
-            </ul>
+    const missingRequiredServiceLabels = useMemo(
+        () => requiredServices
+            .filter((service) => rosGraph.missingRequiredServices.includes(service.name))
+            .map((service) => `${service.label} (${service.name})`),
+        [requiredServices, rosGraph.missingRequiredServices]
+    );
+
+    return (
+        <div className="dependency-panel">
+            <h2>Node and Dependency Status</h2>
+
+            <div className="dependency-grid">
+                <div className="dependency-card running">
+                    <h3>Required Nodes Running</h3>
+                    <ul>
+                        {renderList(runningRequiredNodes, 'No required nodes are running')}
+                    </ul>
+                </div>
+
+                <div className="dependency-card missing">
+                    <h3>Missing Required Nodes</h3>
+                    <ul>
+                        {renderList(rosGraph.missingRequiredNodes, 'All required nodes are running')}
+                    </ul>
+                </div>
+
+                <div className="dependency-card missing-service">
+                    <h3>Missing Required Services</h3>
+                    <ul>
+                        {renderList(missingRequiredServiceLabels, 'All required services are available')}
+                    </ul>
+                </div>
+
+                <div className="dependency-card unexpected">
+                    <h3>Unexpected Nodes</h3>
+                    <ul>
+                        {renderList(rosGraph.unexpectedNodes, 'No unexpected nodes')}
+                    </ul>
+                </div>
+            </div>
+
+            <div className="dependency-blockers">
+                <h3>Why Launch Sub is Blocked</h3>
+                <ul>
+                    {renderList(launchBlockReasons, 'No blockers detected. Launch Sub can proceed.')}
+                </ul>
+            </div>
         </div>
-    </div>
-  );
+    );
 }
 
 export default RosNodeStatus;
