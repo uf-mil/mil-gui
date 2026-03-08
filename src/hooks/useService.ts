@@ -10,11 +10,11 @@ type ServiceResponse<T> = {
 };
 
 type ServiceHookReturn<TRequest, TResponse> = [
-    (request: TRequest) => Promise<void>,
+    (request: TRequest) => Promise<TResponse>,
     ServiceResponse<TResponse>
 ];
 
-export function useService<TRequest = any, TResponse = any>(
+export function useService<TRequest = Record<string, unknown>, TResponse = Record<string, unknown>>(
     serviceName: string,
     serviceType: string
 ): ServiceHookReturn<TRequest, TResponse> {
@@ -26,54 +26,77 @@ export function useService<TRequest = any, TResponse = any>(
         isLoading: false,
     });
 
-    const callService = useCallback(async (request: TRequest) => {
-        if (!ros || !ros.isConnected) {
+    const callService = useCallback(async (request: TRequest): Promise<TResponse> => {
+        if (!serviceName || !serviceType) {
+            const errorMessage = 'Service is not configured';
             setResponse({
                 success: false,
                 data: null,
-                error: 'ROS is not connected',
+                error: errorMessage,
                 isLoading: false,
             });
-            return;
+            throw new Error(errorMessage);
         }
 
-        setResponse(prev => ({ ...prev, isLoading: true }));
+        if (!ros || !ros.isConnected) {
+            const errorMessage = 'ROS is not connected';
+            setResponse({
+                success: false,
+                data: null,
+                error: errorMessage,
+                isLoading: false,
+            });
+            throw new Error(errorMessage);
+        }
+
+        setResponse((previous) => ({ ...previous, isLoading: true, error: null }));
 
         try {
             const service = new ROSLIB.Service({
-                ros: ros,
+                ros,
                 name: serviceName,
-                serviceType: serviceType,
+                serviceType,
             });
 
-            const serviceRequest = new ROSLIB.ServiceRequest(request);
+            const serviceRequest = new ROSLIB.ServiceRequest(request as Record<string, unknown>);
 
-            return new Promise<void>((resolve, reject) => {
-                service.callService(serviceRequest, (result: TResponse) => {
-                    setResponse({
-                        success: true,
-                        data: result,
-                        error: null,
-                        isLoading: false,
-                    });
-                    resolve();
-                }, (error: any) => {
-                    setResponse({
-                        success: false,
-                        data: null,
-                        error: error.message || 'Service call failed',
-                        isLoading: false,
-                    });
-                    reject(error);
-                });
+            return await new Promise<TResponse>((resolve, reject) => {
+                service.callService(
+                    serviceRequest,
+                    (result: TResponse) => {
+                        setResponse({
+                            success: true,
+                            data: result,
+                            error: null,
+                            isLoading: false,
+                        });
+                        resolve(result);
+                    },
+                    (error: unknown) => {
+                        const errorMessage = error instanceof Error
+                            ? error.message
+                            : 'Service call failed';
+                        setResponse({
+                            success: false,
+                            data: null,
+                            error: errorMessage,
+                            isLoading: false,
+                        });
+                        reject(new Error(errorMessage));
+                    }
+                );
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error
+                ? error.message
+                : 'Failed to create service';
             setResponse({
                 success: false,
                 data: null,
-                error: error.message || 'Failed to create service',
+                error: errorMessage,
                 isLoading: false,
             });
+            throw new Error(errorMessage);
         }
     }, [ros, serviceName, serviceType]);
 
