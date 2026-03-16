@@ -3,6 +3,7 @@ import './App.css';
 
 import Preflight from './components/preflight';
 import ServiceExample from './components/ServiceExample';
+import CameraFeed from './components/CameraFeed';
 import LaunchChecklistPanel from './components/LaunchChecklistPanel';
 import { RosProvider } from './components/RosContext';
 import RosNodeStatus from './components/RosNodeList';
@@ -22,6 +23,10 @@ function AppContent() {
                 requiredNodes={launchChecklistConfig.requiredNodes}
                 requiredServices={launchChecklistConfig.requiredServices}
                 launchBlockReasons={checklist.launchBlockReasons}
+            />
+            <CameraFeed
+                config={launchChecklistConfig.camera}
+                availableTopics={rosGraph.runningTopics}
             />
             <div className="App">
                 <Preflight />
