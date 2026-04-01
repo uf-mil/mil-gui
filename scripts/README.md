@@ -106,3 +106,13 @@ If you prefer to run the scripts directly in WSL:
 - Bags are stored in the `bags/` directory at the repo root
 - Recording uses a 15-second default duration (configurable)
 - Playback runs in loop mode by default
+
+## mil2 integration helpers
+
+```powershell
+npm run mil2:health
+npm run mil2:discover
+```
+
+- `mil2:health` prints PASS/WARN/FAIL checks for the launch GUI dependencies.
+- `mil2:discover` lists candidate bringup launch files and relevant ROS packages.

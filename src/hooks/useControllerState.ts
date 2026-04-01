@@ -77,7 +77,12 @@ function resolveTopicSpec(spec: TopicSpec | undefined, runningTopicsByName: Map<
     }
 
     const discoveredType = runningTopicsByName.get(spec.name);
-    const resolvedType = discoveredType ?? spec.type;
+    // Only subscribe to topics currently present in graph to avoid noisy subscribe churn.
+    if (!discoveredType) {
+        return undefined;
+    }
+
+    const resolvedType = discoveredType || spec.type;
 
     if (!isValidRosMessageType(resolvedType)) {
         return undefined;

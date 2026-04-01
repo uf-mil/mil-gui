@@ -143,7 +143,7 @@ function LaunchChecklistPanel({ config, checklist }: LaunchChecklistPanelProps) 
             </div>
 
             <div className="aux-actions">
-                <button onClick={() => runAction('Kill', checklist.handlers.kill)} disabled={actionStates.kill.isLoading}>
+                <button onClick={() => runAction('Kill', checklist.handlers.kill)} disabled={buttonStates.killDisabled}>
                     Emergency Kill
                 </button>
                 {actionStates.kill.error && <span className="step-error">{actionStates.kill.error}</span>}

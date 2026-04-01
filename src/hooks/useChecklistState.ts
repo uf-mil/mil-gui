@@ -39,6 +39,7 @@ export interface ChecklistButtonStates {
     resetLocalizationDisabled: boolean;
     startControllerDisabled: boolean;
     launchSubDisabled: boolean;
+    killDisabled: boolean;
 }
 
 export interface ChecklistState {
@@ -101,6 +102,10 @@ function parseKillStateFromMessage(message: Record<string, unknown> | null): Kil
     }
 
     return 'UNKNOWN';
+}
+
+function normalizeName(name: string): string {
+    return name.startsWith('/') ? name.slice(1) : name;
 }
 
 export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGraphState): ChecklistState {
@@ -209,6 +214,33 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
 
     const launchSubConfigured = isActionConfigured(config.actions.launchSub);
 
+    const runningServiceSet = useMemo(
+        () => new Set(rosGraph.runningServices.map(normalizeName)),
+        [rosGraph.runningServices]
+    );
+
+    const actionServiceAvailability = useMemo(() => {
+        const isAvailable = (serviceName: string): boolean => runningServiceSet.has(normalizeName(serviceName));
+        return {
+            unkill: isAvailable(config.actions.unkill.name),
+            startLocalization: isAvailable(config.actions.startLocalization.name),
+            resetLocalization: isAvailable(config.actions.resetLocalization.name),
+            startController: isAvailable(config.actions.startController.name),
+            launchSub: config.actions.launchSub.name.trim().length > 0
+                ? isAvailable(config.actions.launchSub.name)
+                : false,
+            kill: isAvailable(config.actions.kill.name),
+        };
+    }, [
+        config.actions.kill.name,
+        config.actions.launchSub.name,
+        config.actions.resetLocalization.name,
+        config.actions.startController.name,
+        config.actions.startLocalization.name,
+        config.actions.unkill.name,
+        runningServiceSet,
+    ]);
+
     const launchBlockReasons = useMemo(() => {
         const reasons: string[] = [...dependencyBlockReasons];
 
@@ -218,6 +250,19 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
 
         if (killState !== 'UNKILLED') {
             reasons.push(`Kill state is ${killState}; run Unkill first`);
+        }
+
+        if (!actionServiceAvailability.unkill) {
+            reasons.push(`Missing service: ${config.actions.unkill.name}`);
+        }
+        if (!actionServiceAvailability.startLocalization) {
+            reasons.push(`Missing service: ${config.actions.startLocalization.name}`);
+        }
+        if (!actionServiceAvailability.resetLocalization) {
+            reasons.push(`Missing service: ${config.actions.resetLocalization.name}`);
+        }
+        if (!actionServiceAvailability.startController) {
+            reasons.push(`Missing service: ${config.actions.startController.name}`);
         }
 
         if (!localizationRunning) {
@@ -245,6 +290,14 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         return reasons;
     }, [
         connected,
+        actionServiceAvailability.resetLocalization,
+        actionServiceAvailability.startController,
+        actionServiceAvailability.startLocalization,
+        actionServiceAvailability.unkill,
+        config.actions.resetLocalization.name,
+        config.actions.startController.name,
+        config.actions.startLocalization.name,
+        config.actions.unkill.name,
         controllerState.detail,
         controllerState.isOn,
         dependencyBlockReasons,
@@ -306,6 +359,9 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
             await callAction(config.actions.launchSub, callLaunchSub);
         },
         kill: async () => {
+            if (!actionServiceAvailability.kill) {
+                throw new Error(`Missing service: ${config.actions.kill.name}`);
+            }
             await callAction(config.actions.kill, callKill, () => {
                 setManualUnkillConfirmed(false);
             });
@@ -316,22 +372,26 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         unkillDisabled:
             !connected
             || killState === 'UNKILLED'
+            || !actionServiceAvailability.unkill
             || !isActionConfigured(config.actions.unkill)
             || unkillService.isLoading,
         startLocalizationDisabled:
             !connected
+            || !actionServiceAvailability.startLocalization
             || !isActionConfigured(config.actions.startLocalization)
             || localizationRunning
             || killState !== 'UNKILLED'
             || startLocalizationService.isLoading,
         resetLocalizationDisabled:
             !connected
+            || !actionServiceAvailability.resetLocalization
             || !isActionConfigured(config.actions.resetLocalization)
             || !localizationRunning
             || resetDoneForCurrentCycle
             || resetLocalizationService.isLoading,
         startControllerDisabled:
             !connected
+            || !actionServiceAvailability.startController
             || !isActionConfigured(config.actions.startController)
             || controllerState.isOn
             || !localizationRunning
@@ -341,6 +401,11 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         launchSubDisabled:
             launchBlockReasons.length > 0
             || launchSubService.isLoading,
+        killDisabled:
+            !connected
+            || !actionServiceAvailability.kill
+            || !isActionConfigured(config.actions.kill)
+            || killService.isLoading,
     };
 
     return {
@@ -382,7 +447,9 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
             },
             kill: {
                 isLoading: killService.isLoading,
-                error: killService.error,
+                error: actionServiceAvailability.kill
+                    ? killService.error
+                    : `Missing service: ${config.actions.kill.name}`,
             },
         },
     };

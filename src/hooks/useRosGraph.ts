@@ -23,6 +23,34 @@ function sortUnique(items: string[]): string[] {
     return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeName(name: string): string {
+    return name.startsWith('/') ? name.slice(1) : name;
+}
+
+function equalStringArrays(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+        return false;
+    }
+    for (let i = 0; i < left.length; i += 1) {
+        if (left[i] !== right[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function equalTopicArrays(left: RosTopicInfo[], right: RosTopicInfo[]): boolean {
+    if (left.length !== right.length) {
+        return false;
+    }
+    for (let i = 0; i < left.length; i += 1) {
+        if (left[i].name !== right[i].name || left[i].type !== right[i].type) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function parseTopicsResult(result: unknown): RosTopicInfo[] {
     if (!result || typeof result !== 'object') {
         return [];
@@ -77,7 +105,8 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
                     if (!mounted) {
                         return;
                     }
-                    setRunningNodes(sortUnique(nodes));
+                    const nextNodes = sortUnique(nodes);
+                    setRunningNodes((previous) => equalStringArrays(previous, nextNodes) ? previous : nextNodes);
                     setLastUpdatedMs(Date.now());
                 },
                 (error: unknown) => {
@@ -90,7 +119,8 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
                     if (!mounted) {
                         return;
                     }
-                    setRunningServices(sortUnique(services));
+                    const nextServices = sortUnique(services);
+                    setRunningServices((previous) => equalStringArrays(previous, nextServices) ? previous : nextServices);
                     setLastUpdatedMs(Date.now());
                 },
                 (error: unknown) => {
@@ -103,7 +133,8 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
                     if (!mounted) {
                         return;
                     }
-                    setRunningTopics(parseTopicsResult(topicsResult));
+                    const nextTopics = parseTopicsResult(topicsResult);
+                    setRunningTopics((previous) => equalTopicArrays(previous, nextTopics) ? previous : nextTopics);
                     setLastUpdatedMs(Date.now());
                 },
                 (error: unknown) => {
@@ -122,7 +153,10 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
     }, [connected, config.pollIntervalMs, ros]);
 
     const missingRequiredNodes = useMemo(
-        () => config.requiredNodes.filter((nodeName) => !runningNodes.includes(nodeName)),
+        () => {
+            const runningNodeSet = new Set(runningNodes.map(normalizeName));
+            return config.requiredNodes.filter((nodeName) => !runningNodeSet.has(normalizeName(nodeName)));
+        },
         [config.requiredNodes, runningNodes]
     );
 
@@ -132,22 +166,30 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
     );
 
     const missingRequiredServices = useMemo(
-        () => requiredServiceNames.filter((serviceName) => !runningServices.includes(serviceName)),
+        () => {
+            const runningServiceSet = new Set(runningServices.map(normalizeName));
+            return requiredServiceNames.filter((serviceName) => !runningServiceSet.has(normalizeName(serviceName)));
+        },
         [requiredServiceNames, runningServices]
     );
 
     const topicNameSet = useMemo(
-        () => new Set(runningTopics.map((topic) => topic.name)),
+        () => new Set(runningTopics.map((topic) => normalizeName(topic.name))),
         [runningTopics]
     );
 
     const missingRequiredTopics = useMemo(
-        () => config.requiredTopics.filter((topic) => !topicNameSet.has(topic.name)).map((topic) => topic.name),
+        () => config.requiredTopics
+            .filter((topic) => !topicNameSet.has(normalizeName(topic.name)))
+            .map((topic) => topic.name),
         [config.requiredTopics, topicNameSet]
     );
 
     const unexpectedNodes = useMemo(
-        () => runningNodes.filter((nodeName) => !config.requiredNodes.includes(nodeName)),
+        () => {
+            const expectedSet = new Set(config.requiredNodes.map(normalizeName));
+            return runningNodes.filter((nodeName) => !expectedSet.has(normalizeName(nodeName)));
+        },
         [config.requiredNodes, runningNodes]
     );
 
