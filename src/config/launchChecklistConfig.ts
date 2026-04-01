@@ -22,6 +22,9 @@ export interface RequiredServiceSpec {
 export interface LaunchChecklistConfig {
     pollIntervalMs: number;
     requiredNodes: string[];
+    expectedNodes: string[];
+    hardwareNodes?: string[];
+    hardwareServices?: string[];
     requiredServices: RequiredServiceSpec[];
     requiredTopics: TopicSpec[];
     localization: {
@@ -54,6 +57,7 @@ export interface LaunchChecklistConfig {
         defaultTopicType: string;
         enableTestPattern: boolean;
     };
+    ignoreKillGate?: boolean;
 }
 
 export const launchChecklistConfig: LaunchChecklistConfig = {
@@ -69,6 +73,29 @@ export const launchChecklistConfig: LaunchChecklistConfig = {
         'vectornav',
         '/rosapi',
         '/rosbridge_websocket',
+    ],
+    expectedNodes: [
+        'subjugator_localization',
+        'pid_controller',
+        'thruster_manager',
+        'thrust_and_kill_board',
+        'front_cam',
+        'depth_driver',
+        'waterlinked_dvl_driver',
+        'vectornav',
+        '/rosapi',
+        '/rosbridge_websocket',
+    ],
+    hardwareNodes: [
+        'thrust_and_kill_board',
+        'front_cam',
+        'depth_driver',
+        'waterlinked_dvl_driver',
+        'vectornav',
+    ],
+    hardwareServices: [
+        '/kill',
+        '/unkill',
     ],
     requiredServices: [
         {

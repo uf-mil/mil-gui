@@ -207,6 +207,7 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
     const killState: KillState = telemetryKillState !== 'UNKNOWN'
         ? telemetryKillState
         : (manualUnkillConfirmed ? 'UNKILLED' : 'UNKNOWN');
+    const killGateState: KillState = config.ignoreKillGate ? 'UNKILLED' : killState;
 
     const dependencyBlockReasons = connected
         ? rosGraph.dependencyBlockReasons
@@ -248,7 +249,7 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
             reasons.push('ROS bridge is disconnected');
         }
 
-        if (killState !== 'UNKILLED') {
+        if (!config.ignoreKillGate && killState !== 'UNKILLED') {
             reasons.push(`Kill state is ${killState}; run Unkill first`);
         }
 
@@ -302,6 +303,7 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         controllerState.isOn,
         dependencyBlockReasons,
         killState,
+        config.ignoreKillGate,
         launchSubConfigured,
         localizationRunning,
         resetDoneForCurrentCycle,
@@ -380,7 +382,7 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
             || !actionServiceAvailability.startLocalization
             || !isActionConfigured(config.actions.startLocalization)
             || localizationRunning
-            || killState !== 'UNKILLED'
+            || killGateState !== 'UNKILLED'
             || startLocalizationService.isLoading,
         resetLocalizationDisabled:
             !connected
