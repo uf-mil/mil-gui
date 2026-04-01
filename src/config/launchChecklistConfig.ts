@@ -52,6 +52,7 @@ export interface LaunchChecklistConfig {
     camera: {
         defaultTopicName: string;
         defaultTopicType: string;
+        enableTestPattern: boolean;
     };
 }
 
@@ -116,7 +117,8 @@ export const launchChecklistConfig: LaunchChecklistConfig = {
         commandTopics: [
             {
                 name: '/thruster_efforts',
-                type: 'ThrusterEfforts',
+                // leave blank to auto-resolve from ROS graph at runtime.
+                type: '',
                 label: 'Thruster Efforts',
             },
             {
@@ -176,7 +178,8 @@ export const launchChecklistConfig: LaunchChecklistConfig = {
     thrusters: {
         topic: {
             name: '/thruster_efforts',
-            type: 'ThrusterEfforts',
+            // leave blank to auto-resolve from ROS graph at runtime.
+            type: '',
             label: 'Thruster Efforts',
         },
         zeroWrenchTopic: {
@@ -199,5 +202,6 @@ export const launchChecklistConfig: LaunchChecklistConfig = {
     camera: {
         defaultTopicName: '/front_cam/image_compressed',
         defaultTopicType: 'sensor_msgs/msg/CompressedImage',
+        enableTestPattern: true,
     },
 };

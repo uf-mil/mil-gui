@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { LaunchChecklistConfig } from '../config/launchChecklistConfig';
+import { LaunchChecklistConfig, TopicSpec } from '../config/launchChecklistConfig';
+import { RosTopicInfo } from './useRosGraph';
 import { useTopicActivity } from './useTopicActivity';
 
 export type ControllerSource = 'heartbeat' | 'command' | 'unknown';
@@ -11,6 +12,7 @@ export interface ControllerState {
     lastHeartbeatAgeSec: number | null;
     lastCommandAgeSec: number | null;
     detail: string;
+    diagnostics: string[];
 }
 
 function extractBoolean(message: Record<string, unknown> | null): boolean | null {
@@ -64,19 +66,68 @@ function extractMode(message: Record<string, unknown> | null): string | null {
     return null;
 }
 
-export function useControllerState(config: LaunchChecklistConfig['controller']): ControllerState {
+function isValidRosMessageType(type: string): boolean {
+    const value = type.trim();
+    return value.length > 0 && value.includes('/');
+}
+
+function resolveTopicSpec(spec: TopicSpec | undefined, runningTopicsByName: Map<string, string>): TopicSpec | undefined {
+    if (!spec) {
+        return undefined;
+    }
+
+    const discoveredType = runningTopicsByName.get(spec.name);
+    const resolvedType = discoveredType ?? spec.type;
+
+    if (!isValidRosMessageType(resolvedType)) {
+        return undefined;
+    }
+
+    return {
+        ...spec,
+        type: resolvedType,
+    };
+}
+
+export function useControllerState(
+    config: LaunchChecklistConfig['controller'],
+    runningTopics: RosTopicInfo[]
+): ControllerState {
+    const runningTopicsByName = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const topic of runningTopics) {
+            map.set(topic.name, topic.type);
+        }
+        return map;
+    }, [runningTopics]);
+
+    const resolvedHeartbeatTopic = useMemo(
+        () => resolveTopicSpec(config.heartbeatTopic, runningTopicsByName),
+        [config.heartbeatTopic, runningTopicsByName]
+    );
+    const resolvedModeTopic = useMemo(
+        () => resolveTopicSpec(config.modeTopic, runningTopicsByName),
+        [config.modeTopic, runningTopicsByName]
+    );
+    const resolvedCommandTopics = useMemo(
+        () => config.commandTopics
+            .map((topic) => resolveTopicSpec(topic, runningTopicsByName))
+            .filter((topic): topic is TopicSpec => topic !== undefined),
+        [config.commandTopics, runningTopicsByName]
+    );
+
     const heartbeatSpecs = useMemo(
-        () => (config.heartbeatTopic ? [config.heartbeatTopic] : []),
-        [config.heartbeatTopic]
+        () => (resolvedHeartbeatTopic ? [resolvedHeartbeatTopic] : []),
+        [resolvedHeartbeatTopic]
     );
     const modeSpecs = useMemo(
-        () => (config.modeTopic ? [config.modeTopic] : []),
-        [config.modeTopic]
+        () => (resolvedModeTopic ? [resolvedModeTopic] : []),
+        [resolvedModeTopic]
     );
 
     const heartbeatActivity = useTopicActivity(heartbeatSpecs)[0];
     const modeActivity = useTopicActivity(modeSpecs)[0];
-    const commandActivities = useTopicActivity(config.commandTopics);
+    const commandActivities = useTopicActivity(resolvedCommandTopics);
 
     return useMemo(() => {
         const latestCommandAgeSec = commandActivities
@@ -93,6 +144,20 @@ export function useControllerState(config: LaunchChecklistConfig['controller']):
         const commandInferenceOn = latestCommandAgeSec !== null && latestCommandAgeSec <= config.onAgeThresholdSec;
 
         const mode = extractMode(modeActivity?.lastMessage ?? null);
+        const diagnostics: string[] = [];
+
+        const unresolvedCommandTopics = config.commandTopics.filter((topic) => {
+            const discovered = runningTopicsByName.get(topic.name);
+            const type = discovered ?? topic.type;
+            return !isValidRosMessageType(type);
+        });
+
+        if (resolvedCommandTopics.length === 0) {
+            diagnostics.push('Controller fallback command topics are not available yet.');
+        }
+        if (unresolvedCommandTopics.length > 0) {
+            diagnostics.push(`Unresolved command topic type: ${unresolvedCommandTopics.map((topic) => topic.name).join(', ')}`);
+        }
 
         if (heartbeatAvailable && heartbeatFresh) {
             const heartbeatValue = extractBoolean(heartbeatMessage);
@@ -108,6 +173,7 @@ export function useControllerState(config: LaunchChecklistConfig['controller']):
                 lastHeartbeatAgeSec: heartbeatAgeSec,
                 lastCommandAgeSec: latestCommandAgeSec,
                 detail,
+                diagnostics,
             };
         }
 
@@ -119,6 +185,7 @@ export function useControllerState(config: LaunchChecklistConfig['controller']):
                 lastHeartbeatAgeSec: heartbeatAgeSec,
                 lastCommandAgeSec: latestCommandAgeSec,
                 detail: `Command age ${latestCommandAgeSec.toFixed(2)}s`,
+                diagnostics,
             };
         }
 
@@ -129,6 +196,15 @@ export function useControllerState(config: LaunchChecklistConfig['controller']):
             lastHeartbeatAgeSec: heartbeatAgeSec,
             lastCommandAgeSec: null,
             detail: 'No heartbeat/mode or command activity available',
+            diagnostics,
         };
-    }, [commandActivities, config.onAgeThresholdSec, heartbeatActivity, modeActivity]);
+    }, [
+        commandActivities,
+        config.commandTopics,
+        config.onAgeThresholdSec,
+        heartbeatActivity,
+        modeActivity,
+        resolvedCommandTopics.length,
+        runningTopicsByName,
+    ]);
 }

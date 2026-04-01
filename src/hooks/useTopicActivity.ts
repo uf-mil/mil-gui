@@ -17,6 +17,15 @@ type TopicActivityMap = Record<string, TopicActivity>;
 
 const HZ_WINDOW_SIZE = 10;
 
+function isValidRosMessageType(type: string): boolean {
+    const value = type.trim();
+    if (value.length === 0) {
+        return false;
+    }
+    // rosbridge expects package/msg/Type for ROS2 or package/Type for ROS1.
+    return value.includes('/');
+}
+
 function emptyActivity(spec: TopicSpec): TopicActivity {
     return {
         name: spec.name,
@@ -55,19 +64,24 @@ export function useTopicActivity(specs: TopicSpec[]): TopicActivity[] {
         timeWindowsRef.current = {};
     }, [specs]);
 
+    const subscribableSpecs = useMemo(
+        () => specs.filter((spec) => isValidRosMessageType(spec.type)),
+        [specs]
+    );
+
     useEffect(() => {
-        if (!connected || !ros || !ros.isConnected || specs.length === 0) {
+        if (!connected || !ros || !ros.isConnected || subscribableSpecs.length === 0) {
             return;
         }
 
-        const topics: ROSLIB.Topic[] = specs.map((spec) => new ROSLIB.Topic({
+        const topics: ROSLIB.Topic[] = subscribableSpecs.map((spec) => new ROSLIB.Topic({
             ros,
             name: spec.name,
             messageType: spec.type,
         }));
 
         topics.forEach((topic, index) => {
-            const spec = specs[index];
+            const spec = subscribableSpecs[index];
 
             topic.subscribe((message: ROSLIB.Message) => {
                 const now = Date.now();
@@ -113,7 +127,7 @@ export function useTopicActivity(specs: TopicSpec[]): TopicActivity[] {
                 topic.unadvertise();
             });
         };
-    }, [connected, ros, specs]);
+    }, [connected, ros, subscribableSpecs]);
 
     return useMemo(
         () => specs.map((spec) => {

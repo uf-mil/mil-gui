@@ -48,6 +48,30 @@ function guessImageSource(message: Record<string, unknown>, messageType: string)
     return null;
 }
 
+function isValidRosMessageType(type: string): boolean {
+    const value = type.trim();
+    return value.length > 0 && value.includes('/');
+}
+
+function buildTestPatternDataUrl(): string {
+    const now = new Date().toLocaleTimeString();
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d3b66" />
+      <stop offset="100%" stop-color="#1f7a8c" />
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#g)" />
+  <rect x="60" y="60" width="1160" height="600" fill="none" stroke="#d4f1f9" stroke-width="6" />
+  <text x="640" y="330" text-anchor="middle" font-size="56" fill="#ffffff" font-family="Segoe UI">Camera Test Pattern</text>
+  <text x="640" y="395" text-anchor="middle" font-size="34" fill="#d4f1f9" font-family="Segoe UI">${now}</text>
+  <text x="640" y="455" text-anchor="middle" font-size="26" fill="#d4f1f9" font-family="Segoe UI">ROS camera topic is unavailable</text>
+</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
 function CameraFeed({
     config = launchChecklistConfig.camera,
     availableTopics = [],
@@ -58,6 +82,7 @@ function CameraFeed({
     const [manualTopicName, setManualTopicName] = useState<string>(config.defaultTopicName);
     const [manualTopicType, setManualTopicType] = useState<string>(config.defaultTopicType);
     const [streamEnabled, setStreamEnabled] = useState<boolean>(false);
+    const [testPatternEnabled, setTestPatternEnabled] = useState<boolean>(false);
 
     const [imageData, setImageData] = useState<string | null>(null);
     const [fps, setFps] = useState<number>(0);
@@ -86,6 +111,14 @@ function CameraFeed({
         : (topicTypesByName.get(activeTopicName) ?? config.defaultTopicType);
 
     useEffect(() => {
+        if (testPatternEnabled) {
+            setStreamMessage('Displaying local test pattern');
+            setImageData(buildTestPatternDataUrl());
+            setFps(0);
+            setLatencyMs(null);
+            return;
+        }
+
         if (!connected || !ros || !ros.isConnected || !streamEnabled) {
             setStreamMessage(connected ? 'Stream stopped' : 'ROS disconnected');
             setFps(0);
@@ -98,6 +131,10 @@ function CameraFeed({
 
         if (!activeTopicName || !activeTopicType) {
             setStreamMessage('Topic name/type is required');
+            return;
+        }
+        if (!isValidRosMessageType(activeTopicType)) {
+            setStreamMessage('Invalid ROS message type. Expected package/msg/Type');
             return;
         }
 
@@ -143,7 +180,7 @@ function CameraFeed({
             topic.unsubscribe();
             topic.unadvertise();
         };
-    }, [activeTopicName, activeTopicType, connected, ros, streamEnabled]);
+    }, [activeTopicName, activeTopicType, connected, ros, streamEnabled, testPatternEnabled]);
 
     return (
         <section className="camera-panel">
@@ -191,11 +228,22 @@ function CameraFeed({
                 <button onClick={() => setStreamEnabled((previous) => !previous)} disabled={!connected}>
                     {streamEnabled ? 'Disable Stream' : 'Enable Stream'}
                 </button>
+                {config.enableTestPattern && (
+                    <button
+                        onClick={() => setTestPatternEnabled((previous) => !previous)}
+                        className={testPatternEnabled ? 'secondary-button active' : 'secondary-button'}
+                    >
+                        {testPatternEnabled ? 'Disable Test Pattern' : 'Enable Test Pattern'}
+                    </button>
+                )}
             </div>
 
             <div className="camera-status-row">
                 <span className={`status-pill ${streamEnabled && connected ? 'ok' : 'warn'}`}>
                     Stream: {streamEnabled && connected ? 'RUNNING' : 'STOPPED'}
+                </span>
+                <span className={`status-pill ${testPatternEnabled ? 'warn' : 'neutral'}`}>
+                    Test Pattern: {testPatternEnabled ? 'ON' : 'OFF'}
                 </span>
                 <span className="status-pill neutral">FPS: {fps.toFixed(2)}</span>
                 <span className="status-pill neutral">Latency: {latencyMs !== null ? `${latencyMs}ms` : 'N/A'}</span>

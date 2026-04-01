@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
 
 import Preflight from './components/preflight';
@@ -13,6 +13,7 @@ import { useChecklistState } from './hooks/useChecklistState';
 import { useRosGraph } from './hooks/useRosGraph';
 
 function AppContent() {
+    const [showLegacyPanels, setShowLegacyPanels] = useState<boolean>(false);
     const rosGraph = useRosGraph(launchChecklistConfig);
     const checklist = useChecklistState(launchChecklistConfig, rosGraph);
 
@@ -29,11 +30,21 @@ function AppContent() {
                 config={launchChecklistConfig.camera}
                 availableTopics={rosGraph.runningTopics}
             />
-            <ThrusterSpinPanel config={launchChecklistConfig} />
-            <div className="App">
-                <Preflight />
-                <ServiceExample />
-            </div>
+            <ThrusterSpinPanel config={launchChecklistConfig} availableTopics={rosGraph.runningTopics} />
+            <section className="legacy-controls">
+                <button
+                    className={showLegacyPanels ? 'secondary-button active' : 'secondary-button'}
+                    onClick={() => setShowLegacyPanels((previous) => !previous)}
+                >
+                    {showLegacyPanels ? 'Hide Legacy Panels' : 'Show Legacy Panels'}
+                </button>
+            </section>
+            {showLegacyPanels && (
+                <div className="App legacy-panels">
+                    <Preflight />
+                    <ServiceExample />
+                </div>
+            )}
         </>
     );
 }

@@ -18,6 +18,13 @@ running ros bridge
 -
 `ros2 launch rosbridge_server rosbridge_websocket_launch.xml`
 
+mil2 health check from Windows terminal
+-
+`npm run mil2:health`
+
+This prints the nodes/services/topics needed by the launch checklist. If `/thruster_efforts` is missing,
+the GUI will not subscribe to it and will disable thruster testing instead of spamming rosbridge with invalid type errors.
+
 ### custom hooks
 
 The useRos hook manages the WebSocket (re)connection in the background. 
