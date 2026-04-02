@@ -19,6 +19,10 @@ export interface RosGraphState {
     lastUpdatedMs: number | null;
 }
 
+interface UseRosGraphOptions {
+    mockMil2Mode?: boolean;
+}
+
 function sortUnique(items: string[]): string[] {
     return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b));
 }
@@ -80,8 +84,31 @@ function parseTopicsResult(result: unknown): RosTopicInfo[] {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
+function isValidTopicType(type: string): boolean {
+    const candidate = type.trim();
+    return candidate.length > 0 && candidate.includes('/');
+}
+
+function getMockTopicType(name: string, type: string): string {
+    if (isValidTopicType(type)) {
+        return type;
+    }
+
+    switch (name) {
+        case '/odometry/filtered':
+            return 'nav_msgs/msg/Odometry';
+        case '/cmd_wrench':
+            return 'geometry_msgs/msg/Wrench';
+        case '/thruster_efforts':
+            return 'std_msgs/msg/Float64MultiArray';
+        default:
+            return 'std_msgs/msg/String';
+    }
+}
+
+export function useRosGraph(config: LaunchChecklistConfig, options: UseRosGraphOptions = {}): RosGraphState {
     const { ros, connected } = useRos();
+    const { mockMil2Mode = false } = options;
 
     const [runningNodes, setRunningNodes] = useState<string[]>([]);
     const [runningServices, setRunningServices] = useState<string[]>([]);
@@ -152,12 +179,19 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
         };
     }, [connected, config.pollIntervalMs, ros]);
 
-    const missingRequiredNodes = useMemo(
+    const effectiveRunningNodes = useMemo(
         () => {
-            const runningNodeSet = new Set(runningNodes.map(normalizeName));
-            return config.requiredNodes.filter((nodeName) => !runningNodeSet.has(normalizeName(nodeName)));
+            if (!mockMil2Mode || !connected) {
+                return runningNodes;
+            }
+
+            return sortUnique([
+                ...runningNodes,
+                ...config.requiredNodes,
+                ...config.expectedNodes,
+            ]);
         },
-        [config.requiredNodes, runningNodes]
+        [connected, config.expectedNodes, config.requiredNodes, mockMil2Mode, runningNodes]
     );
 
     const requiredServiceNames = useMemo(
@@ -165,17 +199,108 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
         [config.requiredServices]
     );
 
+    const configuredActionServiceNames = useMemo(
+        () => [
+            config.actions.kill.name,
+            config.actions.unkill.name,
+            config.actions.startLocalization.name,
+            config.actions.resetLocalization.name,
+            config.actions.startController.name,
+            config.actions.launchSub.name,
+        ].filter((serviceName) => serviceName.trim().length > 0),
+        [
+            config.actions.kill.name,
+            config.actions.launchSub.name,
+            config.actions.resetLocalization.name,
+            config.actions.startController.name,
+            config.actions.startLocalization.name,
+            config.actions.unkill.name,
+        ]
+    );
+
+    const effectiveRunningServices = useMemo(
+        () => {
+            if (!mockMil2Mode || !connected) {
+                return runningServices;
+            }
+
+            return sortUnique([
+                ...runningServices,
+                ...requiredServiceNames,
+                ...configuredActionServiceNames,
+            ]);
+        },
+        [configuredActionServiceNames, connected, mockMil2Mode, requiredServiceNames, runningServices]
+    );
+
+    const effectiveRunningTopics = useMemo(
+        () => {
+            if (!mockMil2Mode || !connected) {
+                return runningTopics;
+            }
+
+            const topicMap = new Map<string, string>();
+            for (const topic of runningTopics) {
+                topicMap.set(topic.name, topic.type);
+            }
+
+            const addMockTopic = (name: string, type: string) => {
+                if (topicMap.has(name)) {
+                    return;
+                }
+                topicMap.set(name, getMockTopicType(name, type));
+            };
+
+            for (const topic of config.requiredTopics) {
+                addMockTopic(topic.name, topic.type);
+            }
+            addMockTopic(config.localization.odomTopic.name, config.localization.odomTopic.type);
+
+            for (const topic of config.controller.commandTopics) {
+                addMockTopic(topic.name, topic.type);
+            }
+
+            addMockTopic(config.thrusters.topic.name, config.thrusters.topic.type);
+            addMockTopic(config.thrusters.zeroWrenchTopic.name, config.thrusters.zeroWrenchTopic.type);
+
+            return Array.from(topicMap.entries())
+                .map(([name, type]) => ({ name, type }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+        },
+        [
+            config.controller.commandTopics,
+            config.localization.odomTopic.name,
+            config.localization.odomTopic.type,
+            config.requiredTopics,
+            config.thrusters.topic.name,
+            config.thrusters.topic.type,
+            config.thrusters.zeroWrenchTopic.name,
+            config.thrusters.zeroWrenchTopic.type,
+            connected,
+            mockMil2Mode,
+            runningTopics,
+        ]
+    );
+
+    const missingRequiredNodes = useMemo(
+        () => {
+            const runningNodeSet = new Set(effectiveRunningNodes.map(normalizeName));
+            return config.requiredNodes.filter((nodeName) => !runningNodeSet.has(normalizeName(nodeName)));
+        },
+        [config.requiredNodes, effectiveRunningNodes]
+    );
+
     const missingRequiredServices = useMemo(
         () => {
-            const runningServiceSet = new Set(runningServices.map(normalizeName));
+            const runningServiceSet = new Set(effectiveRunningServices.map(normalizeName));
             return requiredServiceNames.filter((serviceName) => !runningServiceSet.has(normalizeName(serviceName)));
         },
-        [requiredServiceNames, runningServices]
+        [requiredServiceNames, effectiveRunningServices]
     );
 
     const topicNameSet = useMemo(
-        () => new Set(runningTopics.map((topic) => normalizeName(topic.name))),
-        [runningTopics]
+        () => new Set(effectiveRunningTopics.map((topic) => normalizeName(topic.name))),
+        [effectiveRunningTopics]
     );
 
     const missingRequiredTopics = useMemo(
@@ -188,9 +313,9 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
     const unexpectedNodes = useMemo(
         () => {
             const expectedSet = new Set(config.requiredNodes.map(normalizeName));
-            return runningNodes.filter((nodeName) => !expectedSet.has(normalizeName(nodeName)));
+            return effectiveRunningNodes.filter((nodeName) => !expectedSet.has(normalizeName(nodeName)));
         },
-        [config.requiredNodes, runningNodes]
+        [config.requiredNodes, effectiveRunningNodes]
     );
 
     const dependencyBlockReasons = useMemo(() => {
@@ -212,9 +337,9 @@ export function useRosGraph(config: LaunchChecklistConfig): RosGraphState {
     }, [missingRequiredNodes, missingRequiredServices, missingRequiredTopics]);
 
     return {
-        runningNodes,
-        runningServices,
-        runningTopics,
+        runningNodes: effectiveRunningNodes,
+        runningServices: effectiveRunningServices,
+        runningTopics: effectiveRunningTopics,
         missingRequiredNodes,
         missingRequiredServices,
         missingRequiredTopics,

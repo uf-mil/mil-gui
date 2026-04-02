@@ -60,6 +60,10 @@ export interface ChecklistState {
     };
 }
 
+interface UseChecklistStateOptions {
+    mockMil2Mode?: boolean;
+}
+
 type SetBoolResponse = {
     success?: boolean;
     message?: string;
@@ -108,11 +112,16 @@ function normalizeName(name: string): string {
     return name.startsWith('/') ? name.slice(1) : name;
 }
 
-export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGraphState): ChecklistState {
+export function useChecklistState(
+    config: LaunchChecklistConfig,
+    rosGraph: RosGraphState,
+    options: UseChecklistStateOptions = {}
+): ChecklistState {
     const { connected } = useRos();
+    const { mockMil2Mode = false } = options;
 
-    const controllerState = useControllerState(config.controller, rosGraph.runningTopics);
-    const [, localizationHz] = useTopic<Record<string, unknown>>(
+    const liveControllerState = useControllerState(config.controller, rosGraph.runningTopics);
+    const [, liveLocalizationHz] = useTopic<Record<string, unknown>>(
         config.localization.odomTopic.name,
         config.localization.odomTopic.type
     );
@@ -149,20 +158,40 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
     );
 
     const [manualUnkillConfirmed, setManualUnkillConfirmed] = useState<boolean>(false);
+    const [mockKillState, setMockKillState] = useState<KillState>('UNKNOWN');
+    const [mockLocalizationRunning, setMockLocalizationRunning] = useState<boolean>(false);
+    const [mockControllerOn, setMockControllerOn] = useState<boolean>(false);
     const [localizationCycle, setLocalizationCycle] = useState<number>(0);
     const [resetDoneCycle, setResetDoneCycle] = useState<number | null>(null);
     const [stabilizationStartMs, setStabilizationStartMs] = useState<number | null>(null);
     const [nowMs, setNowMs] = useState<number>(Date.now());
 
     const prevLocalizationRunningRef = useRef<boolean>(false);
-
-    const localizationRunning = localizationHz > 0;
+    const localizationHz = mockMil2Mode ? (mockLocalizationRunning ? 20 : 0) : liveLocalizationHz;
+    const localizationRunning = mockMil2Mode ? mockLocalizationRunning : localizationHz > 0;
 
     useEffect(() => {
         if (!connected) {
             setManualUnkillConfirmed(false);
+            if (mockMil2Mode) {
+                setMockKillState('UNKNOWN');
+                setMockLocalizationRunning(false);
+                setMockControllerOn(false);
+            }
         }
-    }, [connected]);
+    }, [connected, mockMil2Mode]);
+
+    useEffect(() => {
+        if (!mockMil2Mode) {
+            setMockKillState('UNKNOWN');
+            setMockLocalizationRunning(false);
+            setMockControllerOn(false);
+            return;
+        }
+
+        setManualUnkillConfirmed(true);
+        setMockKillState('UNKILLED');
+    }, [mockMil2Mode]);
 
     useEffect(() => {
         const intervalRef: ReturnType<typeof setInterval> = setInterval(() => {
@@ -204,16 +233,25 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         && stabilizationElapsedSec >= config.localization.stableSeconds;
 
     const telemetryKillState = parseKillStateFromMessage(killActivity?.lastMessage ?? null);
-    const killState: KillState = telemetryKillState !== 'UNKNOWN'
-        ? telemetryKillState
-        : (manualUnkillConfirmed ? 'UNKILLED' : 'UNKNOWN');
+    const killState: KillState = mockMil2Mode
+        ? mockKillState
+        : (telemetryKillState !== 'UNKNOWN'
+            ? telemetryKillState
+            : (manualUnkillConfirmed ? 'UNKILLED' : 'UNKNOWN'));
     const killGateState: KillState = config.ignoreKillGate ? 'UNKILLED' : killState;
 
-    const dependencyBlockReasons = connected
-        ? rosGraph.dependencyBlockReasons
-        : ['ROS comms disconnected'];
+    const dependencyBlockReasons = useMemo(
+        () => {
+            if (!connected) {
+                return ['ROS comms disconnected'];
+            }
 
-    const launchSubConfigured = isActionConfigured(config.actions.launchSub);
+            return mockMil2Mode ? [] : rosGraph.dependencyBlockReasons;
+        },
+        [connected, mockMil2Mode, rosGraph.dependencyBlockReasons]
+    );
+
+    const launchSubConfigured = mockMil2Mode || isActionConfigured(config.actions.launchSub);
 
     const runningServiceSet = useMemo(
         () => new Set(rosGraph.runningServices.map(normalizeName)),
@@ -221,6 +259,17 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
     );
 
     const actionServiceAvailability = useMemo(() => {
+        if (mockMil2Mode) {
+            return {
+                unkill: true,
+                startLocalization: true,
+                resetLocalization: true,
+                startController: true,
+                launchSub: true,
+                kill: true,
+            };
+        }
+
         const isAvailable = (serviceName: string): boolean => runningServiceSet.has(normalizeName(serviceName));
         return {
             unkill: isAvailable(config.actions.unkill.name),
@@ -239,8 +288,33 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         config.actions.startController.name,
         config.actions.startLocalization.name,
         config.actions.unkill.name,
+        mockMil2Mode,
         runningServiceSet,
     ]);
+
+    const controllerState = useMemo(
+        () => {
+            if (!mockMil2Mode) {
+                return liveControllerState;
+            }
+
+            return {
+                ...liveControllerState,
+                isOn: mockControllerOn,
+                source: 'command' as const,
+                mode: mockControllerOn ? 'MOCK_ON' : 'MOCK_OFF',
+                lastHeartbeatAgeSec: null,
+                lastCommandAgeSec: mockControllerOn ? 0 : null,
+                detail: mockControllerOn
+                    ? 'Mock controller enabled by Sim / No Hardware Mode'
+                    : 'Mock controller is OFF',
+                diagnostics: [
+                    'Mock MIL2 mode is active: node/service/topic checks are simulated.',
+                ],
+            };
+        },
+        [liveControllerState, mockControllerOn, mockMil2Mode]
+    );
 
     const launchBlockReasons = useMemo(() => {
         const reasons: string[] = [...dependencyBlockReasons];
@@ -334,20 +408,41 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
 
     const handlers: ChecklistHandlers = {
         unkill: async () => {
+            if (mockMil2Mode) {
+                setManualUnkillConfirmed(true);
+                setMockKillState('UNKILLED');
+                return;
+            }
             await callAction(config.actions.unkill, callUnkill, () => {
                 setManualUnkillConfirmed(true);
             });
         },
         startLocalization: async () => {
+            if (mockMil2Mode) {
+                setMockLocalizationRunning(true);
+                return;
+            }
             await callAction(config.actions.startLocalization, callStartLocalization);
         },
         resetLocalization: async () => {
+            if (mockMil2Mode) {
+                if (!localizationRunning) {
+                    throw new Error('Localization must be running before reset.');
+                }
+                setResetDoneCycle(localizationCycle);
+                setStabilizationStartMs(Date.now());
+                return;
+            }
             await callAction(config.actions.resetLocalization, callResetLocalization, () => {
                 setResetDoneCycle(localizationCycle);
                 setStabilizationStartMs(localizationRunning ? Date.now() : null);
             });
         },
         startController: async () => {
+            if (mockMil2Mode) {
+                setMockControllerOn(true);
+                return;
+            }
             if (!isActionConfigured(config.actions.startController)) {
                 throw new Error('Start Controller action is not configured');
             }
@@ -358,9 +453,18 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
             }
         },
         launchSub: async () => {
+            if (mockMil2Mode) {
+                return;
+            }
             await callAction(config.actions.launchSub, callLaunchSub);
         },
         kill: async () => {
+            if (mockMil2Mode) {
+                setManualUnkillConfirmed(false);
+                setMockKillState('KILLED');
+                setMockControllerOn(false);
+                return;
+            }
             if (!actionServiceAvailability.kill) {
                 throw new Error(`Missing service: ${config.actions.kill.name}`);
             }
@@ -428,30 +532,32 @@ export function useChecklistState(config: LaunchChecklistConfig, rosGraph: RosGr
         dependencyBlockReasons,
         actionStates: {
             unkill: {
-                isLoading: unkillService.isLoading,
-                error: unkillService.error,
+                isLoading: mockMil2Mode ? false : unkillService.isLoading,
+                error: mockMil2Mode ? null : unkillService.error,
             },
             startLocalization: {
-                isLoading: startLocalizationService.isLoading,
-                error: startLocalizationService.error,
+                isLoading: mockMil2Mode ? false : startLocalizationService.isLoading,
+                error: mockMil2Mode ? null : startLocalizationService.error,
             },
             resetLocalization: {
-                isLoading: resetLocalizationService.isLoading,
-                error: resetLocalizationService.error,
+                isLoading: mockMil2Mode ? false : resetLocalizationService.isLoading,
+                error: mockMil2Mode ? null : resetLocalizationService.error,
             },
             startController: {
-                isLoading: startControllerService.isLoading,
-                error: startControllerService.error,
+                isLoading: mockMil2Mode ? false : startControllerService.isLoading,
+                error: mockMil2Mode ? null : startControllerService.error,
             },
             launchSub: {
-                isLoading: launchSubService.isLoading,
-                error: launchSubService.error,
+                isLoading: mockMil2Mode ? false : launchSubService.isLoading,
+                error: mockMil2Mode ? null : launchSubService.error,
             },
             kill: {
-                isLoading: killService.isLoading,
-                error: actionServiceAvailability.kill
-                    ? killService.error
-                    : `Missing service: ${config.actions.kill.name}`,
+                isLoading: mockMil2Mode ? false : killService.isLoading,
+                error: mockMil2Mode
+                    ? null
+                    : (actionServiceAvailability.kill
+                        ? killService.error
+                        : `Missing service: ${config.actions.kill.name}`),
             },
         },
     };
