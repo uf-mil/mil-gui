@@ -34,6 +34,8 @@
   --dependency-running-bg: #eefbf2;
   --dependency-missing-bg: #fff2f1;
   --dependency-unexpected-bg: #fff9ea;
+  --node-card-heading-text: #1b3348;
+  --node-card-body-text: #2a4359;
 }
 
 [data-theme="dark"] {
@@ -71,6 +73,8 @@
   --dependency-running-bg: #1a2b24;
   --dependency-missing-bg: #2b1a19;
   --dependency-unexpected-bg: #2b2416;
+  --node-card-heading-text: #1b3348;
+  --node-card-body-text: #2a4359;
 }
 
 * {
@@ -294,6 +298,12 @@ body {
 .node-card h3 {
   margin: 0 0 8px 0;
   font-size: 1rem;
+  color: var(--node-card-heading-text);
+}
+
+.node-card ul,
+.node-card li {
+  color: var(--node-card-body-text);
 }
 
 .launch-status-row,
