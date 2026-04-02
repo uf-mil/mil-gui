@@ -28,19 +28,6 @@ no-hardware full mock mode (checklist can go fully green)
 
 Mock mode simulates MIL2 nodes/services/topics in the frontend for UI testing only.
 
-mil2 health check from Windows terminal
--
-`npm run mil2:health`
-
-This prints explicit PASS/WARN/FAIL statuses for launch-flow nodes/services/topics.
-
-bringup discovery (find your actual launch files)
--
-`npm run mil2:discover`
-
-If `/thruster_efforts` is missing, the GUI will not subscribe to it and the thruster panel remains disabled.
-If camera publishers are unavailable, use the Camera panel `Enable Test Pattern` toggle to verify GUI rendering.
-
 ### custom hooks
 
 The useRos hook manages the WebSocket (re)connection in the background. 
