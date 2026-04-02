@@ -32,6 +32,13 @@ function AppContent() {
             return false;
         }
     });
+    const [mockMil2Mode, setMockMil2Mode] = useState<boolean>(() => {
+        try {
+            return localStorage.getItem('sim.mockMil2') === '1';
+        } catch {
+            return false;
+        }
+    });
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
         try {
             return (localStorage.getItem('ui.theme') as 'light' | 'dark') ?? 'light';
@@ -56,17 +63,36 @@ function AppContent() {
         const filteredRequiredServices = launchChecklistConfig.requiredServices
             .filter((service) => !hardwareServiceSet.has(normalizeName(service.name)));
 
-        return {
+        const noHardwareConfig = {
             ...launchChecklistConfig,
             requiredNodes: filteredRequiredNodes,
             expectedNodes: filteredExpectedNodes,
             requiredServices: filteredRequiredServices,
             ignoreKillGate: true,
         };
-    }, [noHardwareMode]);
 
-    const rosGraph = useRosGraph(effectiveConfig);
-    const checklist = useChecklistState(effectiveConfig, rosGraph);
+        if (!mockMil2Mode) {
+            return noHardwareConfig;
+        }
+
+        return {
+            ...noHardwareConfig,
+            actions: {
+                ...noHardwareConfig.actions,
+                launchSub: {
+                    name: '/mock/launch_sub',
+                    type: 'std_srvs/srv/Empty',
+                    label: 'Launch Sub',
+                    request: {},
+                    enabled: true,
+                },
+            },
+        };
+    }, [mockMil2Mode, noHardwareMode]);
+
+    const mockModeEnabled = noHardwareMode && mockMil2Mode;
+    const rosGraph = useRosGraph(effectiveConfig, { mockMil2Mode: mockModeEnabled });
+    const checklist = useChecklistState(effectiveConfig, rosGraph, { mockMil2Mode: mockModeEnabled });
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -81,11 +107,13 @@ function AppContent() {
         setNoHardwareMode(next);
         if (!next) {
             setSimCameraEnabled(false);
+            setMockMil2Mode(false);
         }
         try {
             localStorage.setItem('sim.noHardware', next ? '1' : '0');
             if (!next) {
                 localStorage.setItem('sim.camera', '0');
+                localStorage.setItem('sim.mockMil2', '0');
             }
         } catch {
             setUiError('No-hardware toggle failed to persist. Check browser storage settings.');
@@ -105,6 +133,19 @@ function AppContent() {
         }
     };
 
+    const handleToggleMockMil2 = (next: boolean) => {
+        if (!noHardwareMode) {
+            setUiError('Enable Sim / No Hardware Mode before enabling Mock MIL2.');
+            return;
+        }
+        setMockMil2Mode(next);
+        try {
+            localStorage.setItem('sim.mockMil2', next ? '1' : '0');
+        } catch {
+            setUiError('Mock MIL2 toggle failed to persist. Check browser storage settings.');
+        }
+    };
+
     return (
         <div className="app-shell">
             <HeaderBanner
@@ -118,8 +159,10 @@ function AppContent() {
             <SimControlBar
                 noHardwareMode={noHardwareMode}
                 simCameraEnabled={simCameraEnabled}
+                mockMil2Mode={mockMil2Mode}
                 onToggleNoHardware={handleToggleNoHardware}
                 onToggleSimCamera={handleToggleSimCamera}
+                onToggleMockMil2={handleToggleMockMil2}
                 errorMessage={uiError}
                 onClearError={() => setUiError(null)}
             />

@@ -18,6 +18,16 @@ running ros bridge
 -
 `ros2 launch rosbridge_server rosbridge_websocket_launch.xml`
 
+no-hardware full mock mode (checklist can go fully green)
+-
+1. Start GUI and rosbridge (`npm start` + rosbridge launch above)
+2. In the web app, enable:
+   - `Sim / No Hardware Mode`
+   - `Mock MIL2 Nodes and Services`
+3. Run checklist steps in order (or use `Make Sub Live (Auto)`)
+
+Mock mode simulates MIL2 nodes/services/topics in the frontend for UI testing only.
+
 mil2 health check from Windows terminal
 -
 `npm run mil2:health`

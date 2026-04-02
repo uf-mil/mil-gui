@@ -259,6 +259,15 @@ body {
   font-weight: 600;
 }
 
+.sim-note {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--secondary-bg);
+  color: var(--secondary-text);
+  font-size: 0.85rem;
+}
+
 .link-button {
   border: none;
   background: none;
