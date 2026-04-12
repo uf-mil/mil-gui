@@ -36,6 +36,16 @@
   --dependency-unexpected-bg: #fff9ea;
   --node-card-heading-text: #1b3348;
   --node-card-body-text: #2a4359;
+  --status-ok-bg: #e8f8ef;
+  --status-ok-border: #bee7cf;
+  --status-bad-bg: #fff0ef;
+  --status-bad-border: #f8cec9;
+  --status-warn-bg: #fff7e6;
+  --status-warn-border: #f4deaa;
+  --status-neutral-bg: #f1f5f9;
+  --status-neutral-text: #324456;
+  --status-neutral-border: #d8e1ea;
+  --sticky-row-shadow: 0 8px 18px rgba(20, 45, 70, 0.12);
 }
 
 [data-theme="dark"] {
@@ -75,6 +85,16 @@
   --dependency-unexpected-bg: #2b2416;
   --node-card-heading-text: #1b3348;
   --node-card-body-text: #2a4359;
+  --status-ok-bg: #122d24;
+  --status-ok-border: #2d7652;
+  --status-bad-bg: #321c1b;
+  --status-bad-border: #8f3a32;
+  --status-warn-bg: #302613;
+  --status-warn-border: #80642b;
+  --status-neutral-bg: #172534;
+  --status-neutral-text: #c9d8e6;
+  --status-neutral-border: #2e465d;
+  --sticky-row-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -323,6 +343,19 @@ body {
   margin-bottom: 12px;
 }
 
+.launch-status-row {
+  position: sticky;
+  top: 10px;
+  z-index: 10;
+  align-items: center;
+  margin: -4px -4px 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  box-shadow: var(--sticky-row-shadow);
+}
+
 .status-pill {
   border-radius: 999px;
   padding: 5px 10px;
@@ -332,27 +365,27 @@ body {
 }
 
 .status-pill.ok {
-  background: #e8f8ef;
+  background: var(--status-ok-bg);
   color: var(--ok);
-  border-color: #bee7cf;
+  border-color: var(--status-ok-border);
 }
 
 .status-pill.bad {
-  background: #fff0ef;
+  background: var(--status-bad-bg);
   color: var(--bad);
-  border-color: #f8cec9;
+  border-color: var(--status-bad-border);
 }
 
 .status-pill.warn {
-  background: #fff7e6;
+  background: var(--status-warn-bg);
   color: var(--warn);
-  border-color: #f4deaa;
+  border-color: var(--status-warn-border);
 }
 
 .status-pill.neutral {
-  background: #f1f5f9;
-  color: #324456;
-  border-color: #d8e1ea;
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+  border-color: var(--status-neutral-border);
 }
 
 .checklist-subtext {
