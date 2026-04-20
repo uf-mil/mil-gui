@@ -240,6 +240,23 @@ body {
   margin: 0 0 10px 0;
 }
 
+.panel-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+}
+
+.panel-header-row .status-pill {
+  white-space: normal;
+}
+
 .sim-mode-toggle {
   display: grid;
   gap: 8px;
