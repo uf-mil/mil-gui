@@ -41,9 +41,16 @@ function RosNodeStatus({
         [requiredServices, rosGraph.missingRequiredServices]
     );
 
+    const graphRefreshLabel = rosGraph.lastUpdatedMs === null
+        ? 'Not yet refreshed'
+        : new Date(rosGraph.lastUpdatedMs).toLocaleString();
+
     return (
         <div className="dependency-panel">
-            <h2>Node and Dependency Status</h2>
+            <div className="panel-header-row">
+                <h2>Node and Dependency Status</h2>
+                <span className="status-pill neutral">Graph Refresh: {graphRefreshLabel}</span>
+            </div>
 
             <div className="dependency-grid">
                 <div className="dependency-card running">
