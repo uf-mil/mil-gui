@@ -46,6 +46,8 @@
   --status-neutral-text: #324456;
   --status-neutral-border: #d8e1ea;
   --sticky-row-shadow: 0 8px 18px rgba(20, 45, 70, 0.12);
+  --focus-outline: #1f6fb2;
+  --focus-ring: rgba(58, 167, 255, 0.28);
 }
 
 [data-theme="dark"] {
@@ -95,6 +97,8 @@
   --status-neutral-text: #c9d8e6;
   --status-neutral-border: #2e465d;
   --sticky-row-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  --focus-outline: #7bb6ff;
+  --focus-ring: rgba(123, 182, 255, 0.32);
 }
 
 * {
@@ -191,6 +195,32 @@ body {
   padding: 8px 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.ghost-button,
+.checklist-step button,
+.thruster-actions button,
+.camera-controls button,
+.aux-actions button,
+.camera-controls input,
+.camera-controls select,
+.thruster-controls input,
+.link-button {
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, outline-color 0.18s ease;
+}
+
+.ghost-button:focus-visible,
+.checklist-step button:focus-visible,
+.thruster-actions button:focus-visible,
+.camera-controls button:focus-visible,
+.aux-actions button:focus-visible,
+.camera-controls input:focus-visible,
+.camera-controls select:focus-visible,
+.thruster-controls input:focus-visible,
+.link-button:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .ghost-button:hover {
